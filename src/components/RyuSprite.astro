@@ -1,0 +1,79 @@
+---
+/**
+ * Animated Ryu Hayabusa sprite (frames 2-4 of the Shadow Warriors GBC sheet,
+ * played as a 1,2,3,2 ping-pong to match the original game).
+ *
+ * Uses two pre-rendered spritesheets — a light-palette and a dark-palette strip
+ * (public/sprites/ryu-run-{light,dark}.png) — and swaps between them under the
+ * project's `.dark` class. The run cycle is animated by stepping
+ * background-position across the strip. A transparent gutter between frames
+ * keeps neighbours from bleeding in at the window edges.
+ *
+ * Regenerate the sheets with:  node scripts/gen-ryu-sprite.cjs
+ * (Frame 16x23, stride 18, 4 frames -> strip is 4.5 frame-widths wide.)
+ */
+interface Props {
+	/** Display width in px. Height follows the 16:23 sprite ratio. */
+	width?: number
+	/** Seconds for one full cycle (4 steps: frames 1,2,3,2). Lower = faster run. */
+	speed?: string
+	/** Mirror horizontally (face the other way). */
+	flip?: boolean
+	class?: string
+	style?: string
+}
+
+const { width = 96, speed = '0.6s', flip = false, class: className, style } = Astro.props
+---
+
+<span
+	class:list={['ryu', className]}
+	data-flip={flip ? '' : undefined}
+	style={`--ryu-w:${width}px;--ryu-speed:${speed};${style ?? ''}`}
+	role="img"
+	aria-label="Ryu Hayabusa running"></span>
+
+<style>
+	.ryu {
+		--ryu-w: 96px;
+
+		display: inline-block;
+		flex: none;
+		width: var(--ryu-w);
+		height: calc(var(--ryu-w) * 23 / 16);
+
+		background-image: url('/sprites/ryu-run-light.png');
+		background-repeat: no-repeat;
+		/* Strip is 4.5 frame-widths wide; 'auto' height keeps the pixels square. */
+		background-size: calc(var(--ryu-w) * 4.5) auto;
+		background-position: 0 0;
+		image-rendering: pixelated;
+
+		animation: ryu-run var(--ryu-speed) steps(4) infinite;
+	}
+
+	/* Dark-mode sheet — the project toggles theme via an ancestor `.dark`. */
+	:global(.dark) .ryu {
+		background-image: url('/sprites/ryu-run-dark.png');
+	}
+
+	.ryu[data-flip] {
+		transform: scaleX(-1);
+	}
+
+	/* Step one frame (1.125 = stride 18 / frame 16) per tick; land on gutters. */
+	@keyframes ryu-run {
+		from {
+			background-position: 0 0;
+		}
+		to {
+			background-position: calc(var(--ryu-w) * -4.5) 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.ryu {
+			animation: none;
+		}
+	}
+</style>

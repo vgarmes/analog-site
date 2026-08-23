@@ -1,0 +1,254 @@
+---
+/**
+ * Dreamcast VMU-style dot-matrix display.
+ *
+ * Renders the VMU's 48x32 monochrome LCD as a grid of DOM "dots" and shows a
+ * centred 32x32 game icon (the VMU save-icon format). The player cycles through
+ * a handful of games with the ◄/► buttons, the pip row, or arrow keys; swapping
+ * icons only toggles the handful of dots that changed, and a per-column CSS
+ * transition gives the characteristic left-to-right LCD "wipe" as it redraws.
+ *
+ * Icon art lives in src/data/vmu-games.ts — regenerate it with:
+ *   node scripts/gen-vmu-icons.cjs
+ */
+import { VMU_GAMES } from '../data/vmu-games'
+
+interface Props {
+	/** Pixel size of each LCD dot. */
+	dot?: number
+	/** Pixel gap between dots. */
+	gap?: number
+	/** Index of the game shown first. */
+	start?: number
+	class?: string
+}
+
+const { dot = 8, gap = 1, start = 0, class: className } = Astro.props
+
+const W = 48
+const H = 32
+
+// For each game, the flat indices of the lit dots on the 48x32 grid.
+// Each icon may be smaller than the screen and is centred by its own size.
+const frames = VMU_GAMES.map(game => {
+	const on: number[] = []
+	const iconH = game.rows.length
+	const iconW = Math.max(...game.rows.map(r => r.length))
+	const offX = Math.floor((W - iconW) / 2)
+	const offY = Math.floor((H - iconH) / 2)
+	game.rows.forEach((row, y) => {
+		for (let x = 0; x < row.length; x++) {
+			if (row[x] === '#') on.push((y + offY) * W + (x + offX))
+		}
+	})
+	return { title: game.title, on }
+})
+
+const startIndex = ((start % frames.length) + frames.length) % frames.length
+const initialOn = new Set(frames[startIndex].on)
+const dataJson = JSON.stringify({ start: startIndex, frames })
+---
+
+<figure
+	class:list={['vmu', className]}
+	style={`--dot:${dot}px;--gap:${gap}px;--w:${W};`}
+	data-vmu
+	tabindex="0"
+	role="group"
+	aria-label="Dreamcast VMU game selector"
+>
+	<div class="screen" aria-hidden="true">
+		{
+			Array.from({ length: W * H }).map((_, i) => (
+				<span
+					class:list={['dot', initialOn.has(i) && 'on']}
+					style={`--c:${i % W}`}
+				/>
+			))
+		}
+	</div>
+
+	<figcaption class="controls">
+		<button type="button" class="btn" data-prev aria-label="Previous game"
+			>◄</button
+		>
+		<span class="title font-pixel-grid" data-title aria-live="polite">
+			{frames[startIndex].title}
+		</span>
+		<button type="button" class="btn" data-next aria-label="Next game">►</button
+		>
+	</figcaption>
+
+	<div class="pips" role="group" aria-label="Select game">
+		{
+			frames.map((f, i) => (
+				<button
+					type="button"
+					class="pip"
+					data-idx={i}
+					aria-label={`Show ${f.title}`}
+					aria-current={i === startIndex ? 'true' : 'false'}
+				/>
+			))
+		}
+	</div>
+
+	<script
+		type="application/json"
+		class="vmu-data"
+		set:html={dataJson}
+		is:inline
+	/>
+</figure>
+
+<script>
+	function initVmu(root: HTMLElement) {
+		const dataEl = root.querySelector('.vmu-data')
+		if (!dataEl?.textContent) return
+		const { start, frames } = JSON.parse(dataEl.textContent) as {
+			start: number
+			frames: { title: string; on: number[] }[]
+		}
+		const sets = frames.map(f => new Set(f.on))
+		const dots = root.querySelectorAll<HTMLElement>('.dot')
+		const titleEl = root.querySelector<HTMLElement>('[data-title]')!
+		const pips = [...root.querySelectorAll<HTMLElement>('.pip')]
+		let cur = start
+
+		function show(i: number) {
+			cur = ((i % frames.length) + frames.length) % frames.length
+			const on = sets[cur]
+			dots.forEach((d, idx) => d.classList.toggle('on', on.has(idx)))
+			titleEl.textContent = frames[cur].title
+			pips.forEach((p, idx) =>
+				p.setAttribute('aria-current', idx === cur ? 'true' : 'false')
+			)
+		}
+
+		root
+			.querySelector('[data-prev]')!
+			.addEventListener('click', () => show(cur - 1))
+		root
+			.querySelector('[data-next]')!
+			.addEventListener('click', () => show(cur + 1))
+		pips.forEach((p, idx) => p.addEventListener('click', () => show(idx)))
+		root.addEventListener('keydown', e => {
+			if (e.key === 'ArrowLeft') {
+				show(cur - 1)
+				e.preventDefault()
+			} else if (e.key === 'ArrowRight') {
+				show(cur + 1)
+				e.preventDefault()
+			}
+		})
+	}
+
+	document.querySelectorAll<HTMLElement>('[data-vmu]').forEach(initVmu)
+</script>
+
+<style>
+	.vmu {
+		/* Grayscale, theme-aware: --foreground is near-black in light, near-white in dark. */
+		--dot-on: var(--foreground);
+		--dot-off: color-mix(in srgb, var(--foreground) 12%, transparent);
+		--fade: 260ms;
+
+		display: inline-flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1rem;
+		width: max-content;
+		margin: 0;
+	}
+	.vmu:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 6px;
+		border-radius: 4px;
+	}
+
+	.screen {
+		display: grid;
+		grid-template-columns: repeat(var(--w), var(--dot));
+		grid-auto-rows: var(--dot);
+		gap: var(--gap);
+	}
+
+	.dot {
+		width: var(--dot);
+		height: var(--dot);
+		border-radius: 22%;
+		background: var(--dot-off);
+		transition: background-color var(--fade) ease;
+		transition-delay: calc(var(--c) * 4ms); /* left-to-right wipe on switch */
+	}
+	.dot.on {
+		background: var(--dot-on);
+	}
+
+	.controls {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 1rem;
+	}
+	.title {
+		min-width: 12ch;
+		text-align: center;
+		font-size: 0.8rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--foreground);
+	}
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.5rem;
+		height: 1.5rem;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		color: var(--muted-foreground);
+		font-size: 0.7rem;
+		line-height: 1;
+		transition:
+			color 120ms ease,
+			transform 80ms ease;
+	}
+	.btn:hover {
+		color: var(--foreground);
+	}
+	.btn:active {
+		transform: translateY(1px);
+	}
+	.btn:focus-visible,
+	.pip:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 3px;
+		border-radius: 3px;
+	}
+
+	.pips {
+		display: flex;
+		gap: 0.5rem;
+	}
+	.pip {
+		width: 0.5rem;
+		height: 0.5rem;
+		padding: 0;
+		border: 0;
+		border-radius: 50%;
+		background: var(--dot-off);
+		transition: background-color 150ms ease;
+	}
+	.pip[aria-current='true'] {
+		background: var(--foreground);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.dot {
+			transition: none;
+			transition-delay: 0ms;
+		}
+	}
+</style>

@@ -1,0 +1,75 @@
+.prose :where(h2):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+	margin-bottom: 24px;
+	opacity: 0.9;
+	margin-top: 48px;
+	margin-bottom: 24px;
+	font-weight: 600;
+
+	@media (min-width: 768px) {
+		margin-top: 56px;
+	}
+}
+
+.prose :where(p):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+	margin-bottom: 24px;
+	opacity: 0.9;
+}
+
+.prose :where(ul):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+	margin-block: 24px;
+	list-style-type: disc;
+	margin-left: 24px;
+}
+
+.prose :where(ol):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+	margin-block: 24px;
+	list-style-type: decimal;
+	margin-left: 24px;
+}
+
+.prose :where(li):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+	margin-top: 8px;
+}
+
+.prose :where(.kbd):not(:where([class~='not-prose'], [class~='not-prose'] *)),
+.prose
+	:where(li > code):not(:where([class~='not-prose'], [class~='not-prose'] *)),
+.prose
+	:where(p > code):not(:where([class~='not-prose'], [class~='not-prose'] *)),
+.prose
+	:where(span > code):not(
+		:where([class~='not-prose'], [class~='not-prose'] *)
+	) {
+	border-radius: 0.375rem;
+	border-width: 1px;
+	border-color: var(--color-gray-400);
+	background-color: var(--color-gray-200);
+	padding: 2px 3.6px;
+	font-size: 0.8571429em;
+}
+
+.prose :where(img):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+	margin-top: 2em;
+	margin-bottom: 2em;
+	border-radius: 0.375rem;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.prose :where(a):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+	color: inherit;
+	text-decoration: underline;
+	text-decoration-color: var(--color-gray-800);
+	text-decoration-thickness: 1px;
+	text-underline-position: from-font;
+	transition-property: text-decoration-color;
+	transition-timing-function: var(
+		--default-transition-timing-function
+	); /* cubic-bezier(0.4, 0, 0.2, 1) */
+	transition-duration: var(--default-transition-duration); /* 150ms */
+}
+
+.prose
+	:where(a):not(:where([class~='not-prose'], [class~='not-prose'] *)):hover {
+	text-decoration-color: var(--color-gray-1200);
+}

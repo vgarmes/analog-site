@@ -1,0 +1,59 @@
+---
+title: 'My First Experience with a MiSTer FPGA'
+description: "What happens when emulation isn't enough."
+pubDate: 'Jul 22 2026'
+---
+
+A while back I wrote about going analog. Picking up a CRT, hooking up old consoles, deliberately choosing things that do one thing well.
+
+At some point I started wondering if there was a way to play old games on that CRT without needing to own every original console. I've been collecting for a while, but retro games have become incredibly expensive. Cartridges that used to be a few dollars now go for absurd amounts, and the hobby is starting to feel unsustainable. I wanted something that felt right, not just close enough, without having to chase every original cart and console. That's when I fell into the MiSTer rabbit hole. An FPGA that recreates the hardware at the circuit level, as close to the original experience as you can get without owning the actual machine.
+
+## What is the MiSTer?
+
+MiSTer is an open-source project that runs classic hardware on an FPGA chip. Consoles, arcade boards, home computers.
+
+FPGA stands for Field-Programmable Gate Array. Normal chips, like the CPU in your laptop, are fixed. Their logic is baked in at manufacturing time and can't be changed. An FPGA is different: it's a chip made of hundreds of thousands of programmable logic blocks that can be wired together in software. You describe the circuit you want in a hardware description language, and the FPGA reconfigures itself to match. It's not running a program that simulates a chip. It _is_ the chip.
+
+While software emulation _translates_ how old hardware behaves, FPGAs _become_ the hardware, at the circuit level. The timing, the quirks, the things that made each system feel the way it did, all of it is there because it's running on logic gates. Short of owning the original machine, this is as accurate as it gets.
+
+None of this would be possible without an extraordinary amount of work done by a small group of dedicated people. Engineers and hobbyists who reverse-engineer decades-old chips, document undiscovered hardware behavior, and translate all of that into HDL code that recreates each system gate by gate. People like [Jotego](https://github.com/jotego), who has spent years meticulously recreating arcade hardware, or [Robert Peip](https://github.com/MiSTer-devel), who maintains the MiSTer project itself. They're doing preservation work as much as engineering. Making sure these systems don't disappear when the last original hardware finally fails.
+
+## Getting started
+
+The first question is how to actually get one. Depending on where you live, there are different vendors and kits, but they tend to be expensive. A fully kitted unit can run around $600. I wasn't comfortable spending that on something I had zero hands-on experience with.
+
+After some research and a helpful thread on Reddit, I landed on a different option: a [Hamgeek](https://www.hgeek.com/products/hamgeek-mister-game-console-with-cyclone-v-soc-fpga-development-board-plastic-metal-shell-and-32gb-tf-card?variant=47319987224741) clone on AliExpress. Hamgeek is a curious little company that mostly sells amateur radio gear and the occasional odd gadget. They also happen to sell a MiSTer-compatible unit that came fully assembled, with a 32 GB SD card preloaded with cores and everything ready to go. It cost around $160 and arrived without any need for initial flashing, which let me skip straight to testing.
+
+Is it identical to the "real" thing? Probably not, and the purists on Reddit will let you know. But for getting started without a significant financial commitment, it did the job.
+
+## Setting it up
+
+The core of the MiSTer is a Cyclone V SoC FPGA development board, paired with an IO board, a RAM module, and an SD card loaded with cores and ROMs. The IO board is what adds the connectors you actually need, including a VGA output, which in my case was the whole point: plugging it straight into the CRT.
+
+Even though the Hamgeek unit came fully configured, I decided to swap the included 32 GB card for a 512 GB one of higher quality and start fresh. For that I used [MR. Fusion](https://mister-devel.github.io/MkDocs_MiSTer/setup/software/), the recommended way to get MiSTer up and running on a new SD card. You flash it onto the card, boot the device once, and it takes care of expanding the partition and setting everything up automatically. From there, [MiSTer Downloader](https://github.com/MiSTer-devel/MiSTer_Downloader) handles keeping cores and system files up to date. I also added [Update All](https://github.com/theypsilon/Update_All_MiSTer), a community script that goes further and updates everything in one go, including cores from third-party repositories.
+
+## Connecting to a CRT
+
+With the software side sorted, I ordered a [VGA to SCART cable](https://ultimatemister.com/product/rgb-scart-cable/) to hook the MiSTer up to the CRT. It arrived, I plugged everything in, and got nothing. Black screen.
+
+After some digging I found the issue. The MiSTer IO board has three pins labeled VGA_POWER that can supply either 3.3V or 5V. CRT televisions expect a voltage signal through the SCART input to know they should use the RGB lines, and without it the TV just ignores the signal. Those pins were not connected by default. Once I knew what to look for, the fix was simple: install a jumper on the 5V pin.
+
+I did, powered it back on, and the CRT came to life.
+
+That moment was genuinely exciting. Seeing it work after all the research and troubleshooting made it feel earned.
+
+## PlayStation
+
+The first core I really dug into was the PSX core. PlayStation 1, the system my parents gave me one Christmas in the late 90s.
+
+Getting it working felt strange in a good way. Not strange like something was wrong. Strange like bumping into something you forgot existed.
+
+The PSX core on MiSTer is recent and still maturing, but it handles the games I've tried without issues. The original PlayStation didn't have the cleanest hardware. Lots of texture warping, integer-only 3D math. All of that is faithfully there. Which is exactly the point.
+
+## Early impressions
+
+I've had it for just a few weeks, so I'm still figuring out what it is to me. Part gaming device, part preservation project, part excuse to revisit things I played as a kid without the compromises of modern emulation.
+
+What I wasn't expecting was how much of the appeal is the device itself. A small board that quietly pretends to be a PlayStation, or an SNES, or an arcade cabinet from 1993. There's something almost philosophical about it. Hardware that exists to become other hardware.
+
+The rabbit hole goes deep. I haven't even touched the Amiga core yet.
