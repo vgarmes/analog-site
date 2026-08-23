@@ -1,6 +1,6 @@
 ---
 import BaseHead from '../components/BaseHead.astro'
-import Footer from '../components/Footer.astro'
+import SiteFooter from '../components/site-footer.astro'
 import Header from '../components/Header.astro'
 import { SITE_DESCRIPTION, SITE_TITLE } from '../consts'
 
@@ -15,15 +15,15 @@ const { title, description } = Astro.props
 			description={description ?? SITE_DESCRIPTION}
 		/>
 	</head>
-	<body class="bg-background text-foreground font-pixel-square antialiased">
-		<div class="m-auto flex min-h-screen max-w-5xl flex-col">
+	<body class="bg-muted text-foreground font-pixel-square antialiased">
+		<div class="m-auto flex min-h-screen max-w-6xl flex-col">
 			<Header />
-			<div class="flex flex-col px-5 py-5 md:py-12">
+			<div class="flex flex-1 flex-col px-5 py-5 md:py-12">
 				<main class="pb-12">
 					<slot />
 				</main>
 			</div>
-			<Footer />
+			<SiteFooter />
 		</div>
 	</body>
 </html>

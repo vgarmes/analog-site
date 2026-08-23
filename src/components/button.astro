@@ -1,0 +1,11 @@
+---
+const { props } = Astro.props
+---
+
+<button
+	type="button"
+	tabindex="0"
+	class="group/button bg-primary text-primary-foreground inline-flex h-8 w-full shrink-0 items-center justify-center gap-1.5 px-2.5 text-xs font-medium whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
+>
+	<slot />
+</button>

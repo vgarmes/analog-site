@@ -1,0 +1,11 @@
+---
+const { class: className, ...props } = Astro.props
+---
+
+<div
+	data-slot="card-content"
+	class:list={['px-(--card-spacing)', className]}
+	{...props}
+>
+	<slot />
+</div>
