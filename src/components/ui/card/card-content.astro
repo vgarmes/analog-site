@@ -1,0 +1,7 @@
+---
+const { class: className, ...props } = Astro.props
+---
+
+<div data-slot="card-content" class={className} {...props}>
+	<slot />
+</div>

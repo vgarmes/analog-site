@@ -3,12 +3,14 @@ import { getCollection } from 'astro:content'
 import FormattedDate from '../components/FormattedDate.astro'
 import BaseLayout from '../layouts/base.astro'
 import VmuDisplay from '../components/VmuDisplay.astro'
-import Card from '../components/card/card.astro'
-import CardHeader from '../components/card/card-header.astro'
-import CardTitle from '../components/card/card-title.astro'
-import CardContent from '../components/card/card-content.astro'
-import CardFooter from '../components/card/card-footer.astro'
-import Button from '../components/button.astro'
+import Card from '../components/ui/card/card.astro'
+import CardHeader from '../components/ui/card/card-header.astro'
+import CardTitle from '../components/ui/card/card-title.astro'
+import CardContent from '../components/ui/card/card-content.astro'
+import CardFooter from '../components/ui/card/card-footer.astro'
+import Button from '../components/ui/button.astro'
+import Navigation from '../components/navigation.astro'
+import ArrowRight from '../components/icons/arrow-right.astro'
 
 const posts = (await getCollection('blog')).sort(
 	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
@@ -26,21 +28,12 @@ const posts = (await getCollection('blog')).sort(
 	</div>
 
 	<div
-		class="mt-16 flex flex-col items-stretch gap-5 sm:mt-32 sm:flex-row sm:items-start"
+		class="mt-16 flex flex-col items-stretch gap-5 lg:flex-row lg:items-start"
 	>
-		<div class="hidden min-w-30 sm:block">
-			<ul class="flex flex-col gap-2">
-				<li>
-					<a href="/" class="font-pixel-grid flex gap-1 text-2xl">Home</a>
-				</li>
-				<li>
-					<a href="/" class="font-pixel-grid flex gap-1 text-2xl">About</a>
-				</li>
-			</ul>
-		</div>
+		<Navigation />
 		<Card class="flex-1">
 			<CardHeader>
-				<CardTitle>WRITING</CardTitle>
+				<CardTitle>Writing</CardTitle>
 			</CardHeader>
 
 			<div class="space-y-5 sm:space-y-6">
@@ -50,7 +43,7 @@ const posts = (await getCollection('blog')).sort(
 							<li>
 								<a
 									href={`/blog/${post.id}/`}
-									class="flex gap-1 px-4 py-3 hover:bg-[#F5F4F4] md:grid md:grid-cols-[1fr_100px] md:gap-4 dark:hover:bg-gray-200"
+									class="hover:bg-muted flex gap-1 p-3 md:grid md:grid-cols-[1fr_100px] md:gap-4"
 								>
 									<div class="flex flex-col">
 										<span>{post.data.title}</span>
@@ -61,7 +54,7 @@ const posts = (await getCollection('blog')).sort(
 
 									<FormattedDate
 										date={post.data.pubDate}
-										class="text-muted-foreground hidden text-right text-sm leading-6 md:block"
+										class="text-muted-foreground hidden text-right text-xs leading-6 md:block"
 									/>
 								</a>
 							</li>
@@ -70,14 +63,21 @@ const posts = (await getCollection('blog')).sort(
 				</ul>
 			</div>
 			<CardFooter>
-				<Button> See all posts </Button>
+				<a
+					class="group text-muted-foreground hover:text-foreground ml-auto inline-flex items-center gap-1 underline-offset-2 hover:cursor-pointer hover:underline"
+				>
+					See all posts
+					<ArrowRight
+						class="size-4 w-0 opacity-0 transition-all group-hover:w-4 group-hover:opacity-100"
+					/>
+				</a>
 			</CardFooter>
 		</Card>
 		<Card>
 			<CardHeader>
 				<CardTitle>VMU</CardTitle>
 			</CardHeader>
-			<CardContent class="flex flex-col items-center">
+			<CardContent class="flex flex-col items-center p-3">
 				<VmuDisplay dot={4} />
 			</CardContent>
 		</Card>

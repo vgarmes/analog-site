@@ -1,0 +1,15 @@
+---
+const { size = 'md', class: className, ...props } = Astro.props
+---
+
+<div
+	data-slot="card"
+	data-size={size}
+	class:list={[
+		'group/card bg-card text-card-foreground ring-foreground/10 flex flex-col overflow-hidden text-sm ring-1',
+		className
+	]}
+	{...props}
+>
+	<slot />
+</div>

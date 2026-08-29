@@ -12,6 +12,8 @@
  *   node scripts/gen-vmu-icons.cjs
  */
 import { VMU_GAMES } from '../data/vmu-games'
+import ChevronLeft from './icons/chevron-left.astro'
+import ChevronRight from './icons/chevron-right.astro'
 
 interface Props {
 	/** Pixel size of each LCD dot. */
@@ -70,12 +72,13 @@ const dataJson = JSON.stringify({ start: startIndex, frames })
 
 	<figcaption class="controls">
 		<button type="button" class="btn" data-prev aria-label="Previous game"
-			>◄</button
+			><ChevronLeft class="size-6" /></button
 		>
-		<span class="title font-pixel-grid" data-title aria-live="polite">
+		<span class="font-pixel-grid uppercase" data-title aria-live="polite">
 			{frames[startIndex].title}
 		</span>
-		<button type="button" class="btn" data-next aria-label="Next game">►</button
+		<button type="button" class="btn" data-next aria-label="Next game"
+			><ChevronRight class="size-6" /></button
 		>
 	</figcaption>
 
@@ -190,14 +193,6 @@ const dataJson = JSON.stringify({ start: startIndex, frames })
 		align-items: center;
 		justify-content: center;
 		gap: 1rem;
-	}
-	.title {
-		min-width: 12ch;
-		text-align: center;
-		font-size: 0.8rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--foreground);
 	}
 	.btn {
 		display: inline-flex;
