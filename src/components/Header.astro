@@ -1,9 +1,15 @@
----
-import ThemeToggle from './ThemeToggle.astro'
----
-
-<header class="px-5 py-5">
-	<nav class="flex items-center justify-end">
-		<ThemeToggle />
+<header class="border-b px-5 py-2">
+	<nav class="mx-auto flex max-w-6xl items-center justify-end gap-3">
+		<a
+			href="/"
+			class="hover:bg-primary hover:text-primary-foreground flex cursor-pointer items-center px-2 text-sm uppercase"
+		>
+			home</a
+		>
+		<a
+			class="hover:bg-primary hover:text-primary-foreground flex cursor-pointer items-center px-2 text-sm uppercase"
+		>
+			about</a
+		>
 	</nav>
 </header>

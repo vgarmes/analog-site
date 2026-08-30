@@ -5,7 +5,7 @@ const { class: className, ...props } = Astro.props
 <div
 	data-slot="card-header"
 	class:list={[
-		'group/card-header @container/card-header grid auto-rows-min items-start gap-1 border-b px-2 py-1 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]',
+		'group/card-header bg-muted @container/card-header grid auto-rows-min items-start gap-1 border-b px-3 py-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]',
 		className
 	]}
 	{...props}

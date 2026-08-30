@@ -20,7 +20,7 @@ const posts = (await getCollection('blog')).sort(
 <BaseLayout>
 	<div class="flex items-center gap-6">
 		<div>
-			<h1 class="font-pixel-grid pb-3 text-4xl lg:text-8xl">Analog Freak</h1>
+			<h1 class="font-pixel-grid pb-3 text-4xl md:text-8xl">Analog Freak</h1>
 			<h2 class="text-muted-foreground text-xl">
 				Webzine about retro gaming and analog tech
 			</h2>
@@ -28,9 +28,8 @@ const posts = (await getCollection('blog')).sort(
 	</div>
 
 	<div
-		class="mt-16 flex flex-col items-stretch gap-5 lg:flex-row lg:items-start"
+		class="mt-16 flex flex-col items-stretch gap-5 md:flex-row md:items-start"
 	>
-		<Navigation />
 		<Card class="flex-1">
 			<CardHeader>
 				<CardTitle>Writing</CardTitle>

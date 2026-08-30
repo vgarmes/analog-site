@@ -4,7 +4,10 @@ const { class: className, ...props } = Astro.props
 
 <div
 	data-slot="card-title"
-	class:list={['text-sm leading-snug font-medium', className]}
+	class:list={[
+		'text-muted-foregroundleading-snug text-sm font-medium uppercase',
+		className
+	]}
 	{...props}
 >
 	<slot />

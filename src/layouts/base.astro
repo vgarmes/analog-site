@@ -15,15 +15,13 @@ const { title, description } = Astro.props
 			description={description ?? SITE_DESCRIPTION}
 		/>
 	</head>
-	<body class="bg-muted text-foreground font-pixel-square antialiased">
-		<div class="m-auto flex min-h-screen max-w-6xl flex-col">
-			<Header />
-			<div class="flex flex-1 flex-col px-5 py-5 md:py-12">
-				<main class="pb-12">
-					<slot />
-				</main>
-			</div>
-			<SiteFooter />
-		</div>
+	<body
+		class="bg-background text-foreground font-pixel-square flex min-h-screen flex-col antialiased"
+	>
+		<Header />
+		<main class="mx-auto flex w-full max-w-6xl flex-1 flex-col p-5 md:py-12">
+			<slot />
+		</main>
+		<SiteFooter />
 	</body>
 </html>

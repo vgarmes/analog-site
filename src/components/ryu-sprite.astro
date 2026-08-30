@@ -1,17 +1,4 @@
 ---
-/**
- * Animated Ryu Hayabusa sprite (frames 2-4 of the Shadow Warriors GBC sheet,
- * played as a 1,2,3,2 ping-pong to match the original game).
- *
- * Uses two pre-rendered spritesheets — a light-palette and a dark-palette strip
- * (public/sprites/ryu-run-{light,dark}.png) — and swaps between them under the
- * project's `.dark` class. The run cycle is animated by stepping
- * background-position across the strip. A transparent gutter between frames
- * keeps neighbours from bleeding in at the window edges.
- *
- * Regenerate the sheets with:  node scripts/gen-ryu-sprite.cjs
- * (Frame 16x23, stride 18, 4 frames -> strip is 4.5 frame-widths wide.)
- */
 interface Props {
 	/** Display width in px. Height follows the 16:23 sprite ratio. */
 	width?: number
@@ -23,7 +10,13 @@ interface Props {
 	style?: string
 }
 
-const { width = 96, speed = '0.6s', flip = false, class: className, style } = Astro.props
+const {
+	width = 96,
+	speed = '0.6s',
+	flip = false,
+	class: className,
+	style
+} = Astro.props
 ---
 
 <span
@@ -42,7 +35,7 @@ const { width = 96, speed = '0.6s', flip = false, class: className, style } = As
 		width: var(--ryu-w);
 		height: calc(var(--ryu-w) * 23 / 16);
 
-		background-image: url('/sprites/ryu-run-light.png');
+		background-image: url('/sprites/ryu-run.png');
 		background-repeat: no-repeat;
 		/* Strip is 4.5 frame-widths wide; 'auto' height keeps the pixels square. */
 		background-size: calc(var(--ryu-w) * 4.5) auto;
@@ -50,11 +43,6 @@ const { width = 96, speed = '0.6s', flip = false, class: className, style } = As
 		image-rendering: pixelated;
 
 		animation: ryu-run var(--ryu-speed) steps(4) infinite;
-	}
-
-	/* Dark-mode sheet — the project toggles theme via an ancestor `.dark`. */
-	:global(.dark) .ryu {
-		background-image: url('/sprites/ryu-run-dark.png');
 	}
 
 	.ryu[data-flip] {

@@ -2,13 +2,18 @@
 const themes = ['auto', 'light', 'dark'] as const
 ---
 
-<div id="themeToggle" class="flex gap-2 text-sm" role="group" aria-label="Theme">
+<div
+	id="themeToggle"
+	class="flex gap-1 text-sm"
+	role="group"
+	aria-label="Theme"
+>
 	{
-		themes.map((theme) => (
+		themes.map(theme => (
 			<button
 				type="button"
 				data-theme={theme}
-				class="theme-option cursor-pointer uppercase opacity-50 transition-opacity hover:opacity-100"
+				class="theme-option text-muted-foreground hover:text-foreground border-primary hover:bg-primary hover:text-primary-foreground cursor-pointer px-2 uppercase aria-pressed:border"
 			>
 				{theme}
 			</button>
@@ -16,15 +21,8 @@ const themes = ['auto', 'light', 'dark'] as const
 	}
 </div>
 
-<style>
-	.theme-option[aria-pressed='true'] {
-		opacity: 1;
-		text-decoration: underline;
-	}
-</style>
-
 <script is:inline>
-	const applyTheme = (theme) => {
+	const applyTheme = theme => {
 		const isDark =
 			theme === 'dark' ||
 			(theme === 'auto' &&
@@ -34,8 +32,8 @@ const themes = ['auto', 'light', 'dark'] as const
 
 	const getTheme = () => localStorage.getItem('theme') ?? 'auto'
 
-	const setActive = (theme) => {
-		document.querySelectorAll('.theme-option').forEach((button) => {
+	const setActive = theme => {
+		document.querySelectorAll('.theme-option').forEach(button => {
 			button.setAttribute(
 				'aria-pressed',
 				button.dataset.theme === theme ? 'true' : 'false'
@@ -45,7 +43,7 @@ const themes = ['auto', 'light', 'dark'] as const
 
 	setActive(getTheme())
 
-	document.querySelectorAll('.theme-option').forEach((button) => {
+	document.querySelectorAll('.theme-option').forEach(button => {
 		button.addEventListener('click', () => {
 			const theme = button.dataset.theme
 			localStorage.setItem('theme', theme)
