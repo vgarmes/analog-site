@@ -63,12 +63,9 @@ const posts = (await getCollection('blog')).sort(
 			</div>
 			<CardFooter>
 				<a
-					class="group text-muted-foreground hover:text-foreground ml-auto inline-flex items-center gap-1 underline-offset-2 hover:cursor-pointer hover:underline"
+					class="before:text-muted-foreground after:text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:before:text-primary-foreground hover:after:text-primary-foreground ml-auto inline-flex cursor-pointer items-center gap-1 text-xs uppercase before:mr-1.5 before:content-['['] after:ml-1.5 after:content-[']']"
 				>
-					See all posts
-					<ArrowRight
-						class="size-4 w-0 opacity-0 transition-all group-hover:w-4 group-hover:opacity-100"
-					/>
+					All posts →
 				</a>
 			</CardFooter>
 		</Card>
