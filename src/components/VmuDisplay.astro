@@ -16,16 +16,14 @@ import ChevronLeft from './icons/chevron-left.astro'
 import ChevronRight from './icons/chevron-right.astro'
 
 interface Props {
-	/** Pixel size of each LCD dot. */
-	dot?: number
-	/** Pixel gap between dots. */
-	gap?: number
 	/** Index of the game shown first. */
 	start?: number
 	class?: string
 }
 
-const { dot = 8, gap = 1, start = 0, class: className } = Astro.props
+const GAP = 1
+
+const { start = 0, class: className } = Astro.props
 
 const W = 48
 const H = 32
@@ -53,7 +51,7 @@ const dataJson = JSON.stringify({ start: startIndex, frames })
 
 <figure
 	class:list={['vmu', className]}
-	style={`--dot:${dot}px;--gap:${gap}px;--w:${W};`}
+	style={`--gap:${GAP}px;--w:${W};`}
 	data-vmu
 	tabindex="0"
 	role="group"
@@ -156,12 +154,18 @@ const dataJson = JSON.stringify({ start: startIndex, frames })
 		--dot-off: color-mix(in srgb, var(--foreground) 12%, transparent);
 		--fade: 260ms;
 
-		display: inline-flex;
+		/*
+		 * Fill the parent so the display grows/shrinks with the card. When a
+		 * `dot` prop is given, --dot-max caps the width (a fixed size on wide
+		 * screens); otherwise the parent alone controls the width.
+		 */
+
+		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 1rem;
-		width: max-content;
-		margin: 0;
+		width: 100%;
+		margin: 0 auto;
 	}
 	.vmu:focus-visible {
 		outline: 2px solid var(--ring);
@@ -171,14 +175,14 @@ const dataJson = JSON.stringify({ start: startIndex, frames })
 
 	.screen {
 		display: grid;
-		grid-template-columns: repeat(var(--w), var(--dot));
-		grid-auto-rows: var(--dot);
+		/* Dots share the width evenly; the screen fills the parent up to its max. */
+		grid-template-columns: repeat(var(--w), 1fr);
 		gap: var(--gap);
+		width: 100%;
 	}
 
 	.dot {
-		width: var(--dot);
-		height: var(--dot);
+		aspect-ratio: 1;
 		/* border-radius: 22%; */
 		background: var(--dot-off);
 		transition: background-color var(--fade) ease;
