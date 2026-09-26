@@ -73,7 +73,7 @@
 }
 
 @theme inline {
-	--font-sans: var(--font-geist-sans);
+	--font-sans: var(--font-geist-mono);
 	--font-mono: var(--font-geist-mono);
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
@@ -107,20 +107,4 @@
 	&::-webkit-scrollbar {
 		display: none;
 	}
-}
-
-@utility font-pixel-square {
-	font-family: var(--font-geist-pixel-square);
-}
-@utility font-pixel-circle {
-	font-family: var(--font-geist-pixel-circle);
-}
-@utility font-pixel-grid {
-	font-family: var(--font-geist-pixel-grid);
-}
-@utility font-pixel-triangle {
-	font-family: var(--font-geist-pixel-triangle);
-}
-@utility font-pixel-line {
-	font-family: var(--font-geist-pixel-line);
 }

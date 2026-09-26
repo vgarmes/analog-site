@@ -11,84 +11,13 @@ export default defineConfig({
 
 	fonts: [
 		{
-			provider: fontProviders.local(),
-			name: 'Geist Pixel Square',
-			cssVariable: '--font-geist-pixel-square',
+			provider: fontProviders.fontsource(),
+			name: 'Geist Mono',
+			cssVariable: '--font-geist-mono',
 			display: 'swap',
-			fallbacks: ['ui-monospace', 'monospace'],
-			options: {
-				variants: [
-					{
-						weight: 400,
-						style: 'normal',
-						src: ['./src/assets/fonts/GeistPixel-Square.woff2']
-					}
-				]
-			}
-		},
-		{
-			provider: fontProviders.local(),
-			name: 'Geist Pixel Circle',
-			cssVariable: '--font-geist-pixel-circle',
-			display: 'swap',
-			fallbacks: ['ui-monospace', 'monospace'],
-			options: {
-				variants: [
-					{
-						weight: 400,
-						style: 'normal',
-						src: ['./src/assets/fonts/GeistPixel-Circle.woff2']
-					}
-				]
-			}
-		},
-		{
-			provider: fontProviders.local(),
-			name: 'Geist Pixel Grid',
-			cssVariable: '--font-geist-pixel-grid',
-			display: 'swap',
-			fallbacks: ['ui-monospace', 'monospace'],
-			options: {
-				variants: [
-					{
-						weight: 400,
-						style: 'normal',
-						src: ['./src/assets/fonts/GeistPixel-Grid.woff2']
-					}
-				]
-			}
-		},
-		{
-			provider: fontProviders.local(),
-			name: 'Geist Pixel Triangle',
-			cssVariable: '--font-geist-pixel-triangle',
-			display: 'swap',
-			fallbacks: ['ui-monospace', 'monospace'],
-			options: {
-				variants: [
-					{
-						weight: 400,
-						style: 'normal',
-						src: ['./src/assets/fonts/GeistPixel-Triangle.woff2']
-					}
-				]
-			}
-		},
-		{
-			provider: fontProviders.local(),
-			name: 'Geist Pixel Line',
-			cssVariable: '--font-geist-pixel-line',
-			display: 'swap',
-			fallbacks: ['ui-monospace', 'monospace'],
-			options: {
-				variants: [
-					{
-						weight: 400,
-						style: 'normal',
-						src: ['./src/assets/fonts/GeistPixel-Line.woff2']
-					}
-				]
-			}
+			weights: ['100 900'],
+			styles: ['normal'],
+			fallbacks: ['ui-monospace', 'monospace']
 		}
 	],
 
