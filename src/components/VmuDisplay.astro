@@ -64,38 +64,49 @@ const patternId = `vmu-dots-${Math.random().toString(36).slice(2, 8)}`
 >
 	<svg class="screen" viewBox={viewBox} aria-hidden="true">
 		<defs>
-			<pattern id={patternId} width="1" height="1" patternUnits="userSpaceOnUse">
-				<rect class="dot-off" width={DOT} height={DOT} />
+			<pattern
+				id={patternId}
+				width="1"
+				height="1"
+				patternUnits="userSpaceOnUse"
+			>
+				<rect class="dot-off" width={DOT} height={DOT}></rect>
 			</pattern>
 		</defs>
-		<rect width="100%" height="100%" fill={`url(#${patternId})`} />
-		<path class="dot-on" d={frames[startIndex].d} data-icon />
+		<rect width="100%" height="100%" fill={`url(#${patternId})`}></rect>
+		<path class="dot-on" d={frames[startIndex].d} data-icon></path>
 	</svg>
 
-	<figcaption class="controls">
+	<div class="flex items-center justify-between gap-4 self-stretch">
 		<button type="button" class="btn" data-prev aria-label="Previous game"
 			><ChevronLeft class="size-6" /></button
 		>
-		<span class="font-mono uppercase" data-title aria-live="polite">
-			{frames[startIndex].title}
-		</span>
+		<div class="flex flex-col gap-4">
+			<div class="pips" role="group" aria-label="Select game">
+				{
+					frames.map((f, i) => (
+						<button
+							type="button"
+							class="pip"
+							data-idx={i}
+							aria-label={`Show ${f.title}`}
+							aria-current={i === startIndex ? 'true' : 'false'}
+						/>
+					))
+				}
+			</div>
+
+			<figcaption
+				data-title
+				aria-live="polite"
+				class="flex items-center justify-between gap-4 self-stretch font-mono uppercase"
+			>
+				{frames[startIndex].title}
+			</figcaption>
+		</div>
 		<button type="button" class="btn" data-next aria-label="Next game"
 			><ChevronRight class="size-6" /></button
 		>
-	</figcaption>
-
-	<div class="pips" role="group" aria-label="Select game">
-		{
-			frames.map((f, i) => (
-				<button
-					type="button"
-					class="pip"
-					data-idx={i}
-					aria-label={`Show ${f.title}`}
-					aria-current={i === startIndex ? 'true' : 'false'}
-				/>
-			))
-		}
 	</div>
 
 	<script
@@ -177,13 +188,6 @@ const patternId = `vmu-dots-${Math.random().toString(36).slice(2, 8)}`
 	}
 	.dot-on {
 		fill: var(--dot-on);
-	}
-
-	.controls {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 1rem;
 	}
 	.btn {
 		display: inline-flex;
