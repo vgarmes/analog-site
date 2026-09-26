@@ -1,0 +1,231 @@
+---
+/**
+ * Dreamcast VMU-style dot-matrix display, drawn as a single inline SVG.
+ *
+ * Same API and look as <VmuDisplay>, but instead of 1,536 DOM "dots" the
+ * unlit grid is one SVG <pattern> and each 32x32 game icon is one <path>
+ * (a small square per lit pixel), precomputed at build time. Switching games
+ * just swaps the path's `d` attribute. Colours come from CSS custom
+ * properties, so the pixels follow the light/dark theme with no JS.
+ *
+ * Icon art lives in src/data/vmu-games.ts — regenerate it with:
+ *   node scripts/gen-vmu-icons.cjs
+ */
+import { VMU_GAMES } from '../data/vmu-games'
+import ChevronLeft from './icons/chevron-left.astro'
+import ChevronRight from './icons/chevron-right.astro'
+
+interface Props {
+	/** Index of the game shown first. */
+	start?: number
+	class?: string
+}
+
+const { start = 0, class: className } = Astro.props
+
+const W = 48
+const H = 32
+
+// Each dot occupies a 1x1 cell in SVG units; GAP is the empty space between
+// neighbours, as a fraction of a cell. The viewBox drops the trailing gap.
+const GAP = 0.12
+const DOT = +(1 - GAP).toFixed(2)
+const viewBox = `0 0 ${W - GAP} ${H - GAP}`
+
+// For each game, a path with one square per lit dot on the 48x32 grid.
+// Each icon may be smaller than the screen and is centred by its own size.
+const frames = VMU_GAMES.map(game => {
+	let d = ''
+	const iconH = game.rows.length
+	const iconW = Math.max(...game.rows.map(r => r.length))
+	const offX = Math.floor((W - iconW) / 2)
+	const offY = Math.floor((H - iconH) / 2)
+	game.rows.forEach((row, y) => {
+		for (let x = 0; x < row.length; x++) {
+			if (row[x] === '#') d += `M${x + offX} ${y + offY}h${DOT}v${DOT}h-${DOT}z`
+		}
+	})
+	return { title: game.title, d }
+})
+
+const startIndex = ((start % frames.length) + frames.length) % frames.length
+const dataJson = JSON.stringify({ start: startIndex, frames })
+
+// Unique per instance so several displays on one page don't share a pattern id.
+const patternId = `vmu-dots-${Math.random().toString(36).slice(2, 8)}`
+---
+
+<figure
+	class:list={['vmu', className]}
+	data-vmu-svg
+	tabindex="0"
+	role="group"
+	aria-label="Dreamcast VMU game selector"
+>
+	<svg class="screen" viewBox={viewBox} aria-hidden="true">
+		<defs>
+			<pattern id={patternId} width="1" height="1" patternUnits="userSpaceOnUse">
+				<rect class="dot-off" width={DOT} height={DOT} />
+			</pattern>
+		</defs>
+		<rect width="100%" height="100%" fill={`url(#${patternId})`} />
+		<path class="dot-on" d={frames[startIndex].d} data-icon />
+	</svg>
+
+	<figcaption class="controls">
+		<button type="button" class="btn" data-prev aria-label="Previous game"
+			><ChevronLeft class="size-6" /></button
+		>
+		<span class="font-mono uppercase" data-title aria-live="polite">
+			{frames[startIndex].title}
+		</span>
+		<button type="button" class="btn" data-next aria-label="Next game"
+			><ChevronRight class="size-6" /></button
+		>
+	</figcaption>
+
+	<div class="pips" role="group" aria-label="Select game">
+		{
+			frames.map((f, i) => (
+				<button
+					type="button"
+					class="pip"
+					data-idx={i}
+					aria-label={`Show ${f.title}`}
+					aria-current={i === startIndex ? 'true' : 'false'}
+				/>
+			))
+		}
+	</div>
+
+	<script
+		type="application/json"
+		class="vmu-data"
+		set:html={dataJson}
+		is:inline
+	/>
+</figure>
+
+<script>
+	function initVmu(root: HTMLElement) {
+		const dataEl = root.querySelector('.vmu-data')
+		if (!dataEl?.textContent) return
+		const { start, frames } = JSON.parse(dataEl.textContent) as {
+			start: number
+			frames: { title: string; d: string }[]
+		}
+		const icon = root.querySelector<SVGPathElement>('[data-icon]')!
+		const titleEl = root.querySelector<HTMLElement>('[data-title]')!
+		const pips = [...root.querySelectorAll<HTMLElement>('.pip')]
+		let cur = start
+
+		function show(i: number) {
+			cur = ((i % frames.length) + frames.length) % frames.length
+			icon.setAttribute('d', frames[cur].d)
+			titleEl.textContent = frames[cur].title
+			pips.forEach((p, idx) =>
+				p.setAttribute('aria-current', idx === cur ? 'true' : 'false')
+			)
+		}
+
+		root
+			.querySelector('[data-prev]')!
+			.addEventListener('click', () => show(cur - 1))
+		root
+			.querySelector('[data-next]')!
+			.addEventListener('click', () => show(cur + 1))
+		pips.forEach((p, idx) => p.addEventListener('click', () => show(idx)))
+		root.addEventListener('keydown', e => {
+			if (e.key === 'ArrowLeft') {
+				show(cur - 1)
+				e.preventDefault()
+			} else if (e.key === 'ArrowRight') {
+				show(cur + 1)
+				e.preventDefault()
+			}
+		})
+	}
+
+	document.querySelectorAll<HTMLElement>('[data-vmu-svg]').forEach(initVmu)
+</script>
+
+<style>
+	.vmu {
+		/* Grayscale, theme-aware: --foreground is near-black in light, near-white in dark. */
+		--dot-on: var(--foreground);
+		--dot-off: color-mix(in srgb, var(--foreground) 12%, transparent);
+
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1rem;
+		width: 100%;
+		margin: 0 auto;
+	}
+	.vmu:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 6px;
+	}
+
+	.screen {
+		display: block;
+		width: 100%;
+		height: auto;
+	}
+	.dot-off {
+		fill: var(--dot-off);
+	}
+	.dot-on {
+		fill: var(--dot-on);
+	}
+
+	.controls {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 1rem;
+	}
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.5rem;
+		height: 1.5rem;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		color: var(--muted-foreground);
+		font-size: 0.7rem;
+		line-height: 1;
+		transition:
+			color 120ms ease,
+			transform 80ms ease;
+	}
+	.btn:hover {
+		color: var(--foreground);
+	}
+	.btn:active {
+		transform: translateY(1px);
+	}
+	.btn:focus-visible,
+	.pip:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 3px;
+	}
+
+	.pips {
+		display: flex;
+		gap: 0.5rem;
+	}
+	.pip {
+		width: 0.5rem;
+		height: 0.5rem;
+		padding: 0;
+		border: 0;
+		background: var(--dot-off);
+		transition: background-color 150ms ease;
+	}
+	.pip[aria-current='true'] {
+		background: var(--foreground);
+	}
+</style>
