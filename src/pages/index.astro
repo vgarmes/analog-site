@@ -3,7 +3,6 @@ import { getCollection } from 'astro:content'
 import FormattedDate from '../components/FormattedDate.astro'
 import BaseLayout from '../layouts/base.astro'
 import VmuDisplay from '../components/VmuDisplay.astro'
-import VmuDisplaySvg from '../components/VmuDisplaySvg.astro'
 import Card from '../components/ui/card/card.astro'
 import CardHeader from '../components/ui/card/card-header.astro'
 import CardTitle from '../components/ui/card/card-title.astro'
@@ -57,23 +56,13 @@ const posts = (await getCollection('blog')).sort(
 				</a>
 			</CardFooter>
 		</Card>
-		<div class="flex flex-col gap-5">
-			<Card>
-				<CardHeader>
-					<CardTitle>Visual Memory Unit</CardTitle>
-				</CardHeader>
-				<CardContent class="flex flex-col items-center p-3">
-					<VmuDisplay />
-				</CardContent>
-			</Card>
-			<Card>
-				<CardHeader>
-					<CardTitle>Visual Memory Unit (SVG)</CardTitle>
-				</CardHeader>
-				<CardContent class="flex flex-col items-center p-3">
-					<VmuDisplaySvg />
-				</CardContent>
-			</Card>
-		</div>
+		<Card>
+			<CardHeader>
+				<CardTitle>Visual Memory Unit</CardTitle>
+			</CardHeader>
+			<CardContent class="flex flex-col items-center p-3">
+				<VmuDisplay />
+			</CardContent>
+		</Card>
 	</div>
 </BaseLayout>
