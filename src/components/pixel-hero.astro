@@ -7,7 +7,7 @@
 
 <section
 	data-pixel-hero
-	class="relative h-[min(60vh,520px)] min-h-72 overflow-hidden bg-[#080a0b]"
+	class="relative h-[min(30vh,260px)] min-h-40 overflow-hidden bg-[#080a0b]"
 >
 	<h1 class="sr-only">Analog Freak</h1>
 	<canvas
@@ -233,7 +233,12 @@
 			}
 
 			const titleWidth = Math.min(0.88 * (box.width - 48), 960) * dpr
-			cell = Math.max(2, Math.floor(titleWidth / titleCols))
+			// Sized by width, but never taller than most of the band.
+			const titleHeight = 0.7 * height
+			cell = Math.max(
+				2,
+				Math.floor(Math.min(titleWidth / titleCols, titleHeight / titleRows))
+			)
 			originX = Math.round((width - titleCols * cell) / 2)
 			originY = Math.round((height - titleRows * cell) / 2)
 			cMin = -Math.ceil(originX / cell)
