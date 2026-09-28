@@ -1,7 +1,7 @@
 ---
-// A hero band: a dithered pixel field that drifts and lights up under the
-// cursor, with the site title drawn on the same grid. The title comes in like
-// a badly tracked VHS tape - static, torn scanlines, then a stabilising sweep.
+// A hero band: a drifting, dithered pixel field with the site title drawn on
+// the same grid. The title comes in like a badly tracked VHS tape - torn
+// scanlines, then a stabilising sweep.
 // Loosely after omarchy-site's HeroPixelField, using its Solitude palette.
 ---
 
@@ -20,11 +20,11 @@
 	const DIM = '#2a2e30'
 	const MID = '#4e5457'
 	const LIT = '#798186'
-	const HOVER = '#a1a7aa'
+	const PALE = '#a1a7aa'
 	const CREST = '#cccfd1'
 	const WHITE = '#eceeef'
-	/** The title's inks, from its resting low to a full cursor hit. */
-	const TITLE_INKS = [LIT, HOVER, CREST, WHITE]
+	/** The title's inks: its three resting bands, then a glitch flash. */
+	const TITLE_INKS = [LIT, PALE, CREST, WHITE]
 
 	/** 5x7 pixel font, just the letters the title needs. */
 	const FONT: Record<string, string[]> = {
@@ -55,8 +55,6 @@
 	const NOISE_SIZE = 128
 	/** Grid cells per unit of noise: how big the drifting blobs read. */
 	const CELLS_PER_NOISE = 12
-	/** Cursor reach, in grid cells. */
-	const CURSOR_CELLS = 16
 
 	/** The VHS entrance, in ms: tearing, then the sweep. */
 	const TEAR_END = 900
@@ -205,9 +203,6 @@
 		let titleRows = 0
 		let titleLines = ''
 
-		const pointer = { x: -1e4, y: -1e4 }
-		let strength = 0
-		let targetStrength = 0
 		let effectStart = -1
 
 		const measure = () => {
@@ -268,60 +263,42 @@
 			ctx.fillRect(originX + col * cell, originY + row * cell, cell, cell)
 		}
 
-		/** 0..1: how strongly the cursor lights the cell at (col, row). */
-		const glowAt = (col: number, row: number, reach: number) => {
-			if (strength <= 0.01) return 0
-			const dx = originX + (col + 0.5) * cell - pointer.x
-			const dy = originY + (row + 0.5) * cell - pointer.y
-			const dist = Math.hypot(dx, dy)
-			return dist < reach ? (1 - dist / reach) ** 2 * strength : 0
-		}
-
-		const drawField = (t: number, reach: number) => {
+		const drawField = (t: number) => {
 			for (let r = 0; r < rows; r++) {
 				const row = rMin + r
 				for (let c = 0; c < cols; c++) {
 					const col = cMin + c
 					const shade = ramp[r * cols + c]
-					let lum = 0
-					if (shade > 0.002) {
-						const u = col / CELLS_PER_NOISE
-						const v = row / CELLS_PER_NOISE
-						const base =
-							0.6 * sample(noise, u + t * 0.14, v - t * 0.055) +
-							0.4 * sample(noise, u * 0.55 - t * 0.08, v * 0.55 + t * 0.06)
-						const twinkle =
-							0.5 +
-							0.5 *
-								Math.sin(t * 1.1 + jitter[(row * 37 + col * 11) & 4095] * 6.283)
-						lum = shade * (0.3 + 0.52 * base * base + 0.18 * twinkle) * 0.62
-					}
-					const glow = glowAt(col, row, reach)
-					lum += glow * 0.6
+					if (shade <= 0.002) continue
+					const u = col / CELLS_PER_NOISE
+					const v = row / CELLS_PER_NOISE
+					const base =
+						0.6 * sample(noise, u + t * 0.14, v - t * 0.055) +
+						0.4 * sample(noise, u * 0.55 - t * 0.08, v * 0.55 + t * 0.06)
+					const twinkle =
+						0.5 +
+						0.5 *
+							Math.sin(t * 1.1 + jitter[(row * 37 + col * 11) & 4095] * 6.283)
+					const lum = shade * (0.3 + 0.52 * base * base + 0.18 * twinkle) * 0.62
 
 					const threshold =
 						0.78 * ((BAYER[(row & 7) * 8 + (col & 7)] + 0.5) / 64) +
 						0.22 * jitter[(row & 63) * 64 + (col & 63)]
 					if (lum <= threshold) continue
-					fillCell(col, row, glow > 0.34 ? LIT : glow > 0.1 ? MID : DIM)
+					fillCell(col, row, DIM)
 				}
 			}
 		}
 
-		/** The title at rest: brighter at the top, lifted by the cursor. */
+		/** The title at rest: brighter at the top. */
 		const restLevel = (row: number) => {
 			const f = row / titleRows
 			return f < 0.45 ? 2 : f < 0.75 ? 1 : 0
 		}
-		const drawTitle = (reach: number) => {
+		const drawTitle = () => {
 			for (let r = 0; r < titleRows; r++) {
-				const rest = restLevel(r)
-				for (let c = 0; c < titleCols; c++) {
-					if (!title[r][c]) continue
-					const glow = glowAt(c, r, reach)
-					const lift = glow > 0.45 ? 2 : glow > 0.12 ? 1 : 0
-					fillCell(c, r, TITLE_INKS[Math.min(3, rest + lift)])
-				}
+				const ink = TITLE_INKS[restLevel(r)]
+				for (let c = 0; c < titleCols; c++) if (title[r][c]) fillCell(c, r, ink)
 			}
 		}
 
@@ -410,16 +387,12 @@
 
 		const draw = (time: number) => {
 			const t = reducedMotion ? 0 : time / 1000
-			// Ease the glow in and out; the pointer position itself is exact.
-			strength += (targetStrength - strength) * 0.3
-			const reach = CURSOR_CELLS * cell * (0.45 + 0.55 * strength)
-
 			ctx.clearRect(0, 0, width, height)
-			drawField(t, reach)
+			drawField(t)
 
 			if (effectStart < 0) effectStart = time
 			const ms = time - effectStart
-			if (reducedMotion || ms >= SWEEP_END) drawTitle(reach)
+			if (reducedMotion || ms >= SWEEP_END) drawTitle()
 			else drawVhs(ms)
 		}
 
@@ -466,28 +439,6 @@
 			draw(reducedMotion ? 0 : lastDraw)
 		}).observe(host)
 
-		if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-			window.addEventListener(
-				'pointermove',
-				event => {
-					const box = host.getBoundingClientRect()
-					const inside =
-						event.clientX >= box.left &&
-						event.clientX <= box.right &&
-						event.clientY >= box.top &&
-						event.clientY <= box.bottom
-					targetStrength = inside ? 1 : 0
-					if (!inside) return
-					pointer.x = (event.clientX - box.left) * dpr
-					pointer.y = (event.clientY - box.top) * dpr
-					if (reducedMotion) draw(0)
-				},
-				{ passive: true }
-			)
-			document.documentElement.addEventListener('pointerleave', () => {
-				targetStrength = 0
-			})
-		}
 	}
 
 	const host = document.querySelector<HTMLElement>('[data-pixel-hero]')
