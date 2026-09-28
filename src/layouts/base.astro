@@ -2,7 +2,6 @@
 import BaseHead from '../components/BaseHead.astro'
 import SiteFooter from '../components/site-footer.astro'
 import Header from '../components/Header.astro'
-import PixelField from '../components/pixel-field.astro'
 import { SITE_DESCRIPTION, SITE_TITLE } from '../consts'
 
 const { title, description } = Astro.props
@@ -19,8 +18,8 @@ const { title, description } = Astro.props
 	<body
 		class="bg-background text-foreground font-mono flex min-h-screen flex-col antialiased"
 	>
-		<PixelField />
 		<Header />
+		<slot name="hero" />
 		<main class="mx-auto flex w-full max-w-6xl flex-1 flex-col p-5 md:py-12">
 			<slot />
 		</main>

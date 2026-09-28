@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content'
 import FormattedDate from '../components/FormattedDate.astro'
 import BaseLayout from '../layouts/base.astro'
+import PixelHero from '../components/pixel-hero.astro'
 import VmuDisplay from '../components/VmuDisplay.astro'
 import Card from '../components/ui/card/card.astro'
 import CardHeader from '../components/ui/card/card-header.astro'
@@ -16,6 +17,7 @@ const posts = (await getCollection('blog')).sort(
 ---
 
 <BaseLayout>
+	<PixelHero slot="hero" />
 	<div class="grid grid-cols-1 items-start gap-5 md:grid-cols-3">
 		<Card class="md:col-span-2">
 			<CardHeader>

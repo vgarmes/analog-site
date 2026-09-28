@@ -1,0 +1,493 @@
+---
+// A hero band: a dithered pixel field that drifts and lights up under the
+// cursor, with the site title drawn on the same grid. The title comes in like
+// a badly tracked VHS tape - static, torn scanlines, then a stabilising sweep.
+// Loosely after omarchy-site's HeroPixelField, using its Solitude palette.
+---
+
+<section
+	data-pixel-hero
+	class="relative h-[min(60vh,520px)] min-h-72 overflow-hidden bg-[#080a0b]"
+>
+	<h1 class="sr-only">Analog Freak</h1>
+	<canvas
+		aria-hidden="true"
+		class="absolute inset-0 h-full w-full select-none"></canvas>
+</section>
+
+<script>
+	/** omarchy's Solitude inks, dimmest to brightest. */
+	const DIM = '#2a2e30'
+	const MID = '#4e5457'
+	const LIT = '#798186'
+	const HOVER = '#a1a7aa'
+	const CREST = '#cccfd1'
+	const WHITE = '#eceeef'
+	/** The title's inks, from its resting low to a full cursor hit. */
+	const TITLE_INKS = [LIT, HOVER, CREST, WHITE]
+
+	/** 5x7 pixel font, just the letters the title needs. */
+	const FONT: Record<string, string[]> = {
+		A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+		N: ['#...#', '##..#', '##..#', '#.#.#', '#..##', '#..##', '#...#'],
+		L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+		O: ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+		G: ['.###.', '#...#', '#....', '#.###', '#...#', '#...#', '.###.'],
+		F: ['#####', '#....', '#....', '####.', '#....', '#....', '#....'],
+		R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+		E: ['#####', '#....', '#....', '####.', '#....', '#....', '#####'],
+		K: ['#...#', '#..#.', '#.#..', '##...', '#.#..', '#..#.', '#...#'],
+		' ': ['...', '...', '...', '...', '...', '...', '...'],
+	}
+	/** Grid cells per font pixel. */
+	const SCALE = 2
+	/** Below this hero width (CSS px) the title breaks onto two lines. */
+	const TWO_LINE_BELOW = 700
+
+	/** Classic 8x8 ordered dither matrix, 0..63. */
+	const BAYER = [
+		0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36,
+		14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41,
+		51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55,
+		23, 61, 29, 53, 21,
+	]
+
+	const NOISE_SIZE = 128
+	/** Grid cells per unit of noise: how big the drifting blobs read. */
+	const CELLS_PER_NOISE = 12
+	/** Cursor reach, in grid cells. */
+	const CURSOR_CELLS = 16
+
+	/** The VHS entrance, in ms: static, then tearing, then the sweep. */
+	const STATIC_END = 350
+	const TEAR_END = 2000
+	const SWEEP_END = 2600
+	/** How far a torn row may slide, in cells. */
+	const MAX_SHIFT = 14
+	/** Random draws are re-rolled this often, so the tearing is jerky. */
+	const TICK_MS = 55
+
+	/** The title as rows of on/off cells, one text line per entry. */
+	function buildTitle(lines: string[]) {
+		const lineGap = 3
+		const widthOf = (line: string) =>
+			[...line].reduce((w, ch) => w + FONT[ch][0].length, 0) + line.length - 1
+		const width = Math.max(...lines.map(widthOf))
+		const height = lines.length * 7 + (lines.length - 1) * lineGap
+		const px = Array.from({ length: height }, () =>
+			new Array<boolean>(width).fill(false)
+		)
+		lines.forEach((line, i) => {
+			let x = Math.floor((width - widthOf(line)) / 2)
+			const top = i * (7 + lineGap)
+			for (const ch of line) {
+				const glyph = FONT[ch]
+				glyph.forEach((row, y) => {
+					for (let gx = 0; gx < row.length; gx++)
+						if (row[gx] === '#') px[top + y][x + gx] = true
+				})
+				x += glyph[0].length + 1
+			}
+		})
+		// Scale font pixels up to grid cells.
+		return Array.from({ length: height * SCALE }, (_, r) =>
+			Array.from(
+				{ length: width * SCALE },
+				(_, c) => px[Math.floor(r / SCALE)][Math.floor(c / SCALE)]
+			)
+		)
+	}
+
+	const lcg = (seed: number) => {
+		let state = seed >>> 0
+		return () => {
+			state = (state * 1664525 + 1013904223) >>> 0
+			return state / 4294967296
+		}
+	}
+
+	/** A stateless 0..1 random number for a triple of integers. */
+	function hash(x: number, y: number, z: number) {
+		let h =
+			Math.imul(x | 0, 0x27d4eb2d) ^
+			Math.imul(y | 0, 0x165667b1) ^
+			Math.imul(z | 0, 0x9e3779b1)
+		h = Math.imul(h ^ (h >>> 15), 0x85ebca6b)
+		h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35)
+		return ((h ^ (h >>> 16)) >>> 0) / 4294967296
+	}
+
+	/** A tileable field of soft blobs: white noise, box-blurred twice. */
+	function buildNoise(seed: number) {
+		const size = NOISE_SIZE
+		const random = lcg(seed)
+		let field = new Float32Array(size * size)
+		for (let i = 0; i < field.length; i++) field[i] = random()
+
+		for (let pass = 0; pass < 2; pass++) {
+			const next = new Float32Array(size * size)
+			for (let y = 0; y < size; y++) {
+				for (let x = 0; x < size; x++) {
+					let sum = 0
+					for (let dy = -1; dy <= 1; dy++) {
+						for (let dx = -1; dx <= 1; dx++) {
+							sum +=
+								field[((y + dy + size) % size) * size + ((x + dx + size) % size)]
+						}
+					}
+					next[y * size + x] = sum / 9
+				}
+			}
+			field = next
+		}
+
+		// Box blurring collapses the range, so stretch it back out.
+		let min = Infinity
+		let max = -Infinity
+		for (const v of field) {
+			if (v < min) min = v
+			if (v > max) max = v
+		}
+		const span = max - min || 1
+		for (let i = 0; i < field.length; i++) field[i] = (field[i] - min) / span
+		return field
+	}
+
+	/** Smoothly interpolated, wrapping lookup into the noise tile. */
+	function sample(field: Float32Array, x: number, y: number) {
+		const size = NOISE_SIZE
+		const xi = Math.floor(x)
+		const yi = Math.floor(y)
+		const fx = x - xi
+		const fy = y - yi
+		const x0 = ((xi % size) + size) % size
+		const y0 = ((yi % size) + size) % size
+		const x1 = (x0 + 1) % size
+		const y1 = (y0 + 1) % size
+		const sx = fx * fx * (3 - 2 * fx)
+		const sy = fy * fy * (3 - 2 * fy)
+		const a = field[y0 * size + x0]
+		const b = field[y0 * size + x1]
+		const c = field[y1 * size + x0]
+		const d = field[y1 * size + x1]
+		return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy
+	}
+
+	function start(host: HTMLElement, canvas: HTMLCanvasElement) {
+		const ctx = canvas.getContext('2d')
+		if (!ctx) return
+
+		const reducedMotion = window.matchMedia(
+			'(prefers-reduced-motion: reduce)'
+		).matches
+		const noise = buildNoise(0x9ece6a)
+		// Per-cell threshold offsets, so the dither does not read as a lattice.
+		const jitter = Float32Array.from({ length: 64 * 64 }, lcg(0x0a1f14))
+
+		// One grid for everything, anchored on the title's top-left cell: title
+		// cells are (0..titleCols, 0..titleRows) and the field runs into
+		// negative and larger indices. Cells are whole device px, so every
+		// edge is sharp and nothing seams.
+		let dpr = 1
+		let width = 0
+		let height = 0
+		let cell = 8
+		let originX = 0
+		let originY = 0
+		let cMin = 0
+		let rMin = 0
+		let cols = 0
+		let rows = 0
+		let ramp = new Float32Array(0)
+		let title: boolean[][] = []
+		let titleCols = 0
+		let titleRows = 0
+		let titleLines = ''
+
+		const pointer = { x: -1e4, y: -1e4 }
+		let strength = 0
+		let targetStrength = 0
+		let effectStart = -1
+
+		const measure = () => {
+			const box = host.getBoundingClientRect()
+			if (box.width < 1 || box.height < 1) return false
+			dpr = Math.min(window.devicePixelRatio || 1, 2)
+			const nextWidth = Math.round(box.width * dpr)
+			const nextHeight = Math.round(box.height * dpr)
+			// Assigning canvas.width wipes the buffer, so only do it on change.
+			if (nextWidth !== width || nextHeight !== height) {
+				width = nextWidth
+				height = nextHeight
+				canvas.width = width
+				canvas.height = height
+			}
+
+			const lines =
+				box.width < TWO_LINE_BELOW ? ['ANALOG', 'FREAK'] : ['ANALOG FREAK']
+			if (lines.join('\n') !== titleLines) {
+				titleLines = lines.join('\n')
+				title = buildTitle(lines)
+				titleRows = title.length
+				titleCols = title[0].length
+			}
+
+			const titleWidth = Math.min(0.88 * (box.width - 48), 960) * dpr
+			cell = Math.max(2, Math.floor(titleWidth / titleCols))
+			originX = Math.round((width - titleCols * cell) / 2)
+			originY = Math.round((height - titleRows * cell) / 2)
+			cMin = -Math.ceil(originX / cell)
+			rMin = -Math.ceil(originY / cell)
+			cols = Math.ceil((width - originX) / cell) - cMin
+			rows = Math.ceil((height - originY) / cell) - rMin
+
+			// A vignette: the middle, where the title sits, stays quiet and the
+			// field thickens towards the edges.
+			ramp = new Float32Array(cols * rows)
+			for (let r = 0; r < rows; r++) {
+				const ny = ((originY + (rMin + r + 0.5) * cell) / height) * 2 - 1
+				for (let c = 0; c < cols; c++) {
+					const nx = ((originX + (cMin + c + 0.5) * cell) / width) * 2 - 1
+					const rr = Math.sqrt(nx * nx + ny * ny * 0.6)
+					const eased = Math.min(1, Math.max(0, (rr - 0.3) / 0.8))
+					ramp[r * cols + c] = eased * eased
+				}
+			}
+			return true
+		}
+
+		/** Fill one grid cell, addressed by title-relative column and row. */
+		const fillCell = (col: number, row: number, ink: string) => {
+			ctx.fillStyle = ink
+			ctx.fillRect(originX + col * cell, originY + row * cell, cell, cell)
+		}
+
+		/** 0..1: how strongly the cursor lights the cell at (col, row). */
+		const glowAt = (col: number, row: number, reach: number) => {
+			if (strength <= 0.01) return 0
+			const dx = originX + (col + 0.5) * cell - pointer.x
+			const dy = originY + (row + 0.5) * cell - pointer.y
+			const dist = Math.hypot(dx, dy)
+			return dist < reach ? (1 - dist / reach) ** 2 * strength : 0
+		}
+
+		const drawField = (t: number, reach: number) => {
+			for (let r = 0; r < rows; r++) {
+				const row = rMin + r
+				for (let c = 0; c < cols; c++) {
+					const col = cMin + c
+					const shade = ramp[r * cols + c]
+					let lum = 0
+					if (shade > 0.002) {
+						const u = col / CELLS_PER_NOISE
+						const v = row / CELLS_PER_NOISE
+						const base =
+							0.6 * sample(noise, u + t * 0.14, v - t * 0.055) +
+							0.4 * sample(noise, u * 0.55 - t * 0.08, v * 0.55 + t * 0.06)
+						const twinkle =
+							0.5 +
+							0.5 *
+								Math.sin(t * 1.1 + jitter[(row * 37 + col * 11) & 4095] * 6.283)
+						lum = shade * (0.3 + 0.52 * base * base + 0.18 * twinkle) * 0.62
+					}
+					const glow = glowAt(col, row, reach)
+					lum += glow * 0.6
+
+					const threshold =
+						0.78 * ((BAYER[(row & 7) * 8 + (col & 7)] + 0.5) / 64) +
+						0.22 * jitter[(row & 63) * 64 + (col & 63)]
+					if (lum <= threshold) continue
+					fillCell(col, row, glow > 0.34 ? LIT : glow > 0.1 ? MID : DIM)
+				}
+			}
+		}
+
+		/** The title at rest: brighter at the top, lifted by the cursor. */
+		const restLevel = (row: number) => {
+			const f = row / titleRows
+			return f < 0.45 ? 2 : f < 0.75 ? 1 : 0
+		}
+		const drawTitle = (reach: number) => {
+			for (let r = 0; r < titleRows; r++) {
+				const rest = restLevel(r)
+				for (let c = 0; c < titleCols; c++) {
+					if (!title[r][c]) continue
+					const glow = glowAt(c, r, reach)
+					const lift = glow > 0.45 ? 2 : glow > 0.12 ? 1 : 0
+					fillCell(c, r, TITLE_INKS[Math.min(3, rest + lift)])
+				}
+			}
+		}
+
+		/**
+		 * One frame of the VHS entrance, `ms` into it. Rows of the title slide
+		 * sideways in torn bands and drop pixels, a tracking wave rolls down,
+		 * static fizzes around it, and all of it calms down until a bright
+		 * scanline sweeps top to bottom and leaves the title stable behind it.
+		 */
+		const drawVhs = (ms: number) => {
+			const tick = Math.floor(ms / TICK_MS)
+			// 0 during static, rising to 1 as the tearing settles.
+			const calm =
+				ms < STATIC_END
+					? 0
+					: Math.min(1, (ms - STATIC_END) / (TEAR_END - STATIC_END))
+			const sweeping = ms >= TEAR_END
+			const scanRow = sweeping
+				? Math.floor(((ms - TEAR_END) / (SWEEP_END - TEAR_END)) * (titleRows + 2)) - 1
+				: -1
+
+			// Static around the title.
+			const snow = sweeping ? 0 : 0.28 * (1 - calm) ** 2
+			if (snow > 0.005) {
+				const pad = 6
+				for (let r = -pad; r < titleRows + pad; r++) {
+					for (let c = -pad; c < titleCols + pad; c++) {
+						const n = hash(c, r, tick)
+						if (n < snow) fillCell(c, r, n < snow * 0.3 ? MID : DIM)
+					}
+				}
+			}
+
+			const amp = MAX_SHIFT * (1 - calm) ** 2
+			const waveRow = ((ms / 700) % 1) * (titleRows + 10) - 5
+
+			for (let r = 0; r < titleRows; r++) {
+				let shift = 0
+				let keep = 1
+				let level = restLevel(r)
+				let ghost = false
+
+				if (sweeping) {
+					if (r === scanRow) {
+						// The beam: a bright line across the whole title.
+						for (let c = -3; c < titleCols + 3; c++)
+							fillCell(c, r, title[r][c] ? WHITE : MID)
+						continue
+					}
+					if (r > scanRow) {
+						shift = Math.round((hash(r, tick, 1) * 2 - 1) * 1.4)
+						keep = 0.85
+					}
+				} else {
+					// Rows tear in bands of two, with a little per-row wobble.
+					const band = Math.floor(r / 2)
+					shift = Math.round(
+						(hash(band, tick, 2) * 2 - 1) * amp +
+							(hash(r, tick, 3) * 2 - 1) * Math.min(amp, 1.5)
+					)
+					keep = ms < STATIC_END ? 0.15 : 0.35 + 0.6 * calm
+					ghost = true
+
+					// The tracking wave: a band of rows thrown further and brighter.
+					if (Math.abs(r - waveRow) < 2.5) {
+						shift += Math.round(amp * 0.8) + 2
+						level = 3
+					}
+					// Now and then a whole row flashes out of place.
+					if (hash(r, tick, 4) < 0.08 * (1 - calm)) {
+						shift = Math.round((hash(r, tick, 5) * 2 - 1) * MAX_SHIFT * 1.5)
+						level = 3
+						keep = 1
+					}
+				}
+
+				// A dim offset copy, like colour bleeding off the tape.
+				if (ghost && amp > 1) {
+					const ghostShift = shift + (hash(r, tick, 6) < 0.5 ? -2 : 2)
+					for (let c = 0; c < titleCols; c++)
+						if (title[r][c] && hash(c, r, tick + 9999) < 0.5)
+							fillCell(c + ghostShift, r, DIM)
+				}
+				for (let c = 0; c < titleCols; c++)
+					if (title[r][c] && (keep >= 1 || hash(c, r, tick) < keep))
+						fillCell(c + shift, r, TITLE_INKS[level])
+			}
+		}
+
+		const draw = (time: number) => {
+			const t = reducedMotion ? 0 : time / 1000
+			// Ease the glow in and out; the pointer position itself is exact.
+			strength += (targetStrength - strength) * 0.3
+			const reach = CURSOR_CELLS * cell * (0.45 + 0.55 * strength)
+
+			ctx.clearRect(0, 0, width, height)
+			drawField(t, reach)
+
+			if (effectStart < 0) effectStart = time
+			const ms = time - effectStart
+			if (reducedMotion || ms >= SWEEP_END) drawTitle(reach)
+			else drawVhs(ms)
+		}
+
+		let frame = 0
+		let lastDraw = 0
+		const loop = (time: number) => {
+			frame = requestAnimationFrame(loop)
+			// Cap at ~40fps; the field does not need more.
+			if (time - lastDraw < 25) return
+			lastDraw = time
+			draw(time)
+		}
+
+		let visible = true
+		let tabVisible = !document.hidden
+		const sync = () => {
+			if (reducedMotion) return
+			const run = visible && tabVisible
+			if (run && frame === 0) frame = requestAnimationFrame(loop)
+			else if (!run && frame !== 0) {
+				cancelAnimationFrame(frame)
+				frame = 0
+			}
+		}
+
+		if (measure()) {
+			if (reducedMotion) draw(0)
+			else frame = requestAnimationFrame(loop)
+		}
+
+		// Pause while the hero is scrolled away or the tab is hidden.
+		new IntersectionObserver(([entry]) => {
+			visible = entry.isIntersecting
+			sync()
+		}).observe(host)
+		document.addEventListener('visibilitychange', () => {
+			tabVisible = !document.hidden
+			sync()
+		})
+
+		new ResizeObserver(() => {
+			if (!measure()) return
+			// Repaint in the same tick so a drag-resize never shows a blank buffer.
+			draw(reducedMotion ? 0 : lastDraw)
+		}).observe(host)
+
+		if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+			window.addEventListener(
+				'pointermove',
+				event => {
+					const box = host.getBoundingClientRect()
+					const inside =
+						event.clientX >= box.left &&
+						event.clientX <= box.right &&
+						event.clientY >= box.top &&
+						event.clientY <= box.bottom
+					targetStrength = inside ? 1 : 0
+					if (!inside) return
+					pointer.x = (event.clientX - box.left) * dpr
+					pointer.y = (event.clientY - box.top) * dpr
+					if (reducedMotion) draw(0)
+				},
+				{ passive: true }
+			)
+			document.documentElement.addEventListener('pointerleave', () => {
+				targetStrength = 0
+			})
+		}
+	}
+
+	const host = document.querySelector<HTMLElement>('[data-pixel-hero]')
+	const canvas = host?.querySelector('canvas')
+	if (host && canvas) start(host, canvas)
+</script>
