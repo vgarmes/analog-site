@@ -58,10 +58,11 @@
 	/** Cursor reach, in grid cells. */
 	const CURSOR_CELLS = 16
 
-	/** The VHS entrance, in ms: static, then tearing, then the sweep. */
-	const STATIC_END = 350
-	const TEAR_END = 2000
-	const SWEEP_END = 2600
+	/** The VHS entrance, in ms: tearing, then the sweep. */
+	const TEAR_END = 900
+	const SWEEP_END = 1450
+	/** How settled the tearing already is on the first frame, 0..1. */
+	const CALM_FROM = 0.5
 	/** How far a torn row may slide, in cells. */
 	const MAX_SHIFT = 14
 	/** Random draws are re-rolled this often, so the tearing is jerky. */
@@ -332,11 +333,8 @@
 		 */
 		const drawVhs = (ms: number) => {
 			const tick = Math.floor(ms / TICK_MS)
-			// 0 during static, rising to 1 as the tearing settles.
-			const calm =
-				ms < STATIC_END
-					? 0
-					: Math.min(1, (ms - STATIC_END) / (TEAR_END - STATIC_END))
+			// Rises to 1 as the tearing settles.
+			const calm = Math.min(1, CALM_FROM + (1 - CALM_FROM) * (ms / TEAR_END))
 			const sweeping = ms >= TEAR_END
 			const scanRow = sweeping
 				? Math.floor(((ms - TEAR_END) / (SWEEP_END - TEAR_END)) * (titleRows + 2)) - 1
@@ -381,7 +379,7 @@
 						(hash(band, tick, 2) * 2 - 1) * amp +
 							(hash(r, tick, 3) * 2 - 1) * Math.min(amp, 1.5)
 					)
-					keep = ms < STATIC_END ? 0.15 : 0.35 + 0.6 * calm
+					keep = 0.35 + 0.6 * calm
 					ghost = true
 
 					// The tracking wave: a band of rows thrown further and brighter.
