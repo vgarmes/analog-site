@@ -1,7 +1,7 @@
 ---
-// A full-viewport dithered pixel field that drifts, lights up under the
-// cursor, and stamps a sprite on click. A framework-free port of the core of
-// omarchy-site's HeroPixelField (no wordmark, music, or etch effects).
+// A full-viewport dithered pixel field that drifts and lights up under the
+// cursor. A simplified, framework-free take on omarchy-site's HeroPixelField,
+// using its Tokyo Night palette.
 ---
 
 <canvas
@@ -11,6 +11,11 @@
 ></canvas>
 
 <script>
+	/** omarchy's Tokyo Night field inks, dimmest to brightest. */
+	const DIM = '#39482e'
+	const MID = '#678549'
+	const LIT = '#9ece6a'
+
 	/** Classic 8x8 ordered dither matrix, 0..63. */
 	const BAYER = [
 		0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36,
@@ -26,39 +31,6 @@
 	const CELLS_PER_NOISE = 9
 	/** Cursor reach, in grid cells. */
 	const CURSOR_CELLS = 12
-	/** How bright the wandering sprite's glow is, against the pointer's. */
-	const SPRITE_STRENGTH = 0.7
-	/** Seconds between the sprite's automatic stamps. */
-	const SPRITE_STAMP_WAIT = [2, 3] as const
-	/** Holding a press grows the stamp; a full charge takes this long. */
-	const CHARGE_TIME = 1.1
-	const CHARGE_FROM = 0.45
-	const CHARGE_GROWTH = 1.6
-
-	/** The glyph a click stamps onto the field. */
-	const STAMP_ROWS = [
-		'00100000100',
-		'00010001000',
-		'00111111100',
-		'01101110110',
-		'11111111111',
-		'10111111101',
-		'10100000101',
-		'00011011000',
-	]
-	const STAMP_W = STAMP_ROWS[0].length
-	const STAMP_H = STAMP_ROWS.length
-
-	type Ping = {
-		x: number
-		y: number
-		born: number
-		/** Cells per stamp pixel at launch and at full bloom. */
-		from: number
-		to: number
-		/** Seconds the stamp takes to bloom out and dissolve. */
-		life: number
-	}
 
 	const lcg = (seed: number) => {
 		let state = seed >>> 0
@@ -68,13 +40,13 @@
 		}
 	}
 
+	/** A tileable field of soft blobs: white noise, box-blurred twice. */
 	function buildNoise(seed: number) {
 		const size = NOISE_SIZE
 		const random = lcg(seed)
 		let field = new Float32Array(size * size)
 		for (let i = 0; i < field.length; i++) field[i] = random()
 
-		// A couple of box passes turn white noise into soft blobs.
 		for (let pass = 0; pass < 2; pass++) {
 			const next = new Float32Array(size * size)
 			for (let y = 0; y < size; y++) {
@@ -104,14 +76,6 @@
 		return field
 	}
 
-	/** A fixed 64x64 tile of per-cell threshold offsets, tiled over the grid. */
-	function buildJitter(seed: number) {
-		const random = lcg(seed)
-		const tile = new Float32Array(64 * 64)
-		for (let i = 0; i < tile.length; i++) tile[i] = random()
-		return tile
-	}
-
 	/** Smoothly interpolated, wrapping lookup into the noise tile. */
 	function sample(field: Float32Array, x: number, y: number) {
 		const size = NOISE_SIZE
@@ -132,81 +96,32 @@
 		return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy
 	}
 
-	/** The field's colours come from the --field-* tokens in global.css. */
-	function readPalette() {
-		const style = getComputedStyle(document.documentElement)
-		const token = (name: string, fallback: string) =>
-			style.getPropertyValue(name).trim() || fallback
-		return {
-			bg: token('--background', '#0e0e14'),
-			dim: token('--field-dim', '#39482e'),
-			mid: token('--field-mid', '#678549'),
-			lit: token('--field-lit', '#9ece6a'),
-		}
-	}
-
 	function start(canvas: HTMLCanvasElement) {
-		const ctx = canvas.getContext('2d', { alpha: false })
+		const ctx = canvas.getContext('2d')
 		if (!ctx) return
 
 		const reducedMotion = window.matchMedia(
 			'(prefers-reduced-motion: reduce)'
 		).matches
-		const finePointer = window.matchMedia(
-			'(hover: hover) and (pointer: fine)'
-		).matches
 		const noise = buildNoise(0x9ece6a)
-		const jitter = buildJitter(0x0a1f14)
-		let palette = readPalette()
+		// Per-cell threshold offsets, so the dither does not read as a lattice.
+		const jitter = Float32Array.from({ length: 64 * 64 }, lcg(0x0a1f14))
 
-		// Device-pixel geometry, recomputed on resize. Everything is drawn on
-		// whole device pixels so cell edges stay razor sharp at any DPR.
 		let dpr = 1
-		let width = 0
-		let height = 0
 		let cell = CELL
 		let cols = 0
 		let rows = 0
 		let ramp = new Float32Array(0)
-
 		const pointer = { x: -1e4, y: -1e4 }
-		const sprite = { x: -1e4, y: -1e4, strength: 0 }
 		let strength = 0
 		let targetStrength = 0
-		let pings: Ping[] = []
-		let holding: { x: number; y: number; start: number } | null = null
-		let spriteStampAt = 0
-
-		const between = ([lo, hi]: readonly [number, number]) =>
-			lo + Math.random() * (hi - lo)
-
-		/** 0..1: how far a held press has charged. */
-		const chargeOf = (now: number, start: number) =>
-			Math.min((now - start) / 1000 / CHARGE_TIME, 1)
-
-		const launch = (x: number, y: number, charge: number, now: number) => {
-			const from = CHARGE_FROM + CHARGE_GROWTH * charge
-			pings = [
-				...pings.slice(-3),
-				{
-					x,
-					y,
-					born: now,
-					from,
-					to: (from + 1.0 + 3.2 * charge) * (0.92 + Math.random() * 0.16),
-					life: (0.65 + 0.55 * charge) * (0.92 + Math.random() * 0.16),
-				},
-			]
-		}
 
 		const measure = () => {
 			dpr = Math.min(window.devicePixelRatio || 1, 2)
-			const nextWidth = Math.round(window.innerWidth * dpr)
-			const nextHeight = Math.round(window.innerHeight * dpr)
+			const width = Math.round(window.innerWidth * dpr)
+			const height = Math.round(window.innerHeight * dpr)
 			// Assigning canvas.width wipes the buffer, so only do it on change.
-			if (nextWidth !== width || nextHeight !== height) {
-				width = nextWidth
-				height = nextHeight
+			if (width !== canvas.width || height !== canvas.height) {
 				canvas.width = width
 				canvas.height = height
 			}
@@ -230,85 +145,16 @@
 
 		const draw = (time: number) => {
 			const t = reducedMotion ? 0 : time / 1000
-
-			// The sprite wanders a slow Lissajous path and stamps now and then.
-			let spriteGoal = 0
-			if (!reducedMotion) {
-				const rx = 0.44 * (1 + 0.1 * Math.sin(t * 0.11))
-				const ry = 0.38 * (1 + 0.1 * Math.sin(t * 0.09 + 2))
-				sprite.x = width * (0.5 + rx * Math.sin(t * 0.65))
-				sprite.y = height * (0.48 + ry * Math.sin(t * 0.39 + 1.1))
-				spriteGoal = SPRITE_STRENGTH
-				if (spriteStampAt === 0) spriteStampAt = time + 1500
-				if (time >= spriteStampAt) {
-					launch(sprite.x, sprite.y, Math.random() * 0.2, time)
-					spriteStampAt = time + between(SPRITE_STAMP_WAIT) * 1000
-				}
-			}
-			sprite.strength += (spriteGoal - sprite.strength) * 0.08
-
-			// The pointer itself is never smoothed; only the fade in and out of
-			// the field's response is eased.
+			// Ease the glow in and out; the pointer position itself is exact.
 			strength += (targetStrength - strength) * 0.3
+			const reach = CURSOR_CELLS * cell * (0.45 + 0.55 * strength)
 
-			ctx.fillStyle = palette.bg
-			ctx.fillRect(0, 0, width, height)
-
-			const reachOf = (level: number) =>
-				CURSOR_CELLS * cell * (0.45 + 0.55 * level)
-			const glows: { x: number; y: number; strength: number; reach: number }[] =
-				[]
-			if (strength > 0.01)
-				glows.push({ ...pointer, strength, reach: reachOf(strength) })
-			if (sprite.strength > 0.01)
-				glows.push({
-					x: sprite.x,
-					y: sprite.y,
-					strength: sprite.strength,
-					reach: reachOf(sprite.strength),
-				})
-
-			// Resolve each live stamp once per frame, not once per cell.
-			const stamps: { x: number; y: number; cellPx: number; amp: number }[] =
-				[]
-			pings = pings.filter(ping => (time - ping.born) / 1000 < ping.life)
-			for (const ping of pings) {
-				const age = (time - ping.born) / 1000 / ping.life
-				const grow = 1 - (1 - age) ** 3
-				stamps.push({
-					x: ping.x,
-					y: ping.y,
-					cellPx: cell * (ping.from + (ping.to - ping.from) * grow),
-					amp: (1 - age) ** 1.7,
-				})
-			}
-			if (holding) {
-				stamps.push({
-					x: holding.x,
-					y: holding.y,
-					cellPx:
-						cell * (CHARGE_FROM + CHARGE_GROWTH * chargeOf(time, holding.start)),
-					amp: 0.9,
-				})
-			}
-
-			/** The strongest live stamp covering a device-px point, if any. */
-			const stampAt = (cx: number, cy: number) => {
-				let amp = 0
-				for (const stamp of stamps) {
-					const lx = Math.floor((cx - stamp.x) / stamp.cellPx + STAMP_W / 2)
-					const ly = Math.floor((cy - stamp.y) / stamp.cellPx + STAMP_H / 2)
-					if (lx < 0 || ly < 0 || lx >= STAMP_W || ly >= STAMP_H) continue
-					if (STAMP_ROWS[ly][lx] === '1' && stamp.amp > amp) amp = stamp.amp
-				}
-				return amp
-			}
+			ctx.clearRect(0, 0, canvas.width, canvas.height)
 
 			for (let row = 0; row < rows; row++) {
-				const yTop = row * cell
-				const y = Math.round(yTop)
-				const cellH = Math.round(yTop + cell) - y
-				const cy = yTop + cell / 2
+				const y = Math.round(row * cell)
+				const h = Math.round((row + 1) * cell) - y
+				const cy = (row + 0.5) * cell
 				for (let col = 0; col < cols; col++) {
 					const shade = ramp[row * cols + col]
 					let lum = 0
@@ -326,38 +172,21 @@
 						lum = shade * (0.3 + 0.52 * base * base + 0.18 * twinkle) * 0.62
 					}
 
-					const xLeft = col * cell
-					const cx = xLeft + cell / 2
-
-					let glowAmount = 0
-					for (const glow of glows) {
-						const dx = cx - glow.x
-						const dy = cy - glow.y
-						const dist = Math.sqrt(dx * dx + dy * dy)
-						if (dist < glow.reach) {
-							const falloff = 1 - dist / glow.reach
-							const amount = falloff * falloff * glow.strength
-							if (amount > glowAmount) glowAmount = amount
-						}
+					let glow = 0
+					if (strength > 0.01) {
+						const dist = Math.hypot((col + 0.5) * cell - pointer.x, cy - pointer.y)
+						if (dist < reach) glow = (1 - dist / reach) ** 2 * strength
 					}
-					lum += glowAmount * 0.6
+					lum += glow * 0.6
 
-					const waveAmount = stamps.length > 0 ? stampAt(cx, cy) : 0
-					lum += waveAmount * 1.15
-
-					// Pure Bayer reads as a regular lattice at this density, so a
-					// fixed per-cell offset scatters the resting field while the
-					// ordered structure still shows where luminance runs high.
 					const threshold =
 						0.78 * ((BAYER[(row & 7) * 8 + (col & 7)] + 0.5) / 64) +
 						0.22 * jitter[(row & 63) * 64 + (col & 63)]
 					if (lum <= threshold) continue
 
-					const heat = Math.max(glowAmount, waveAmount)
-					ctx.fillStyle =
-						heat > 0.34 ? palette.lit : heat > 0.1 ? palette.mid : palette.dim
-					const x = Math.round(xLeft)
-					ctx.fillRect(x, y, Math.round(xLeft + cell) - x, cellH)
+					ctx.fillStyle = glow > 0.34 ? LIT : glow > 0.1 ? MID : DIM
+					const x = Math.round(col * cell)
+					ctx.fillRect(x, y, Math.round((col + 1) * cell) - x, h)
 				}
 			}
 		}
@@ -371,46 +200,9 @@
 			lastDraw = time
 			draw(time)
 		}
-		const redraw = () => draw(reducedMotion ? 0 : lastDraw)
-
-		/** Presses on controls (links, buttons, the header) do not stamp. */
-		const onControl = (target: EventTarget | null) =>
-			target instanceof Element &&
-			target.closest(
-				'a, button, input, select, textarea, label, [role="button"], header, [data-no-stamp]'
-			) !== null
-
-		const onPointerMove = (event: PointerEvent) => {
-			if (!holding) targetStrength = 1
-			pointer.x = event.clientX * dpr
-			pointer.y = event.clientY * dpr
-			if (reducedMotion) redraw()
-		}
-		const onPointerLeave = () => {
-			targetStrength = 0
-		}
-		const onPointerDown = (event: PointerEvent) => {
-			if (reducedMotion || onControl(event.target)) return
-			targetStrength = 0
-			holding = {
-				x: event.clientX * dpr,
-				y: event.clientY * dpr,
-				start: performance.now(),
-			}
-		}
-		const onPointerUp = () => {
-			if (!holding) return
-			if (finePointer) targetStrength = 1
-			const now = performance.now()
-			launch(holding.x, holding.y, chargeOf(now, holding.start), now)
-			holding = null
-		}
-		const onPointerCancel = () => {
-			holding = null
-		}
 
 		measure()
-		if (reducedMotion) redraw()
+		if (reducedMotion) draw(0)
 		else frame = requestAnimationFrame(loop)
 
 		// Stop animating while the tab is hidden.
@@ -424,27 +216,26 @@
 			}
 		})
 
-		if (finePointer) {
-			window.addEventListener('pointermove', onPointerMove, { passive: true })
-			document.documentElement.addEventListener('pointerleave', onPointerLeave)
+		if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+			window.addEventListener(
+				'pointermove',
+				event => {
+					targetStrength = 1
+					pointer.x = event.clientX * dpr
+					pointer.y = event.clientY * dpr
+					if (reducedMotion) draw(0)
+				},
+				{ passive: true }
+			)
+			document.documentElement.addEventListener('pointerleave', () => {
+				targetStrength = 0
+			})
 		}
-		window.addEventListener('pointerdown', onPointerDown, { passive: true })
-		window.addEventListener('pointerup', onPointerUp, { passive: true })
-		window.addEventListener('pointercancel', onPointerCancel, { passive: true })
-		window.addEventListener('contextmenu', onPointerCancel, { passive: true })
+
 		window.addEventListener('resize', () => {
 			measure()
 			// Repaint in the same tick so a drag-resize never shows a blank buffer.
-			redraw()
-		})
-
-		// Follow the light/dark toggle, which flips the .dark class on <html>.
-		new MutationObserver(() => {
-			palette = readPalette()
-			redraw()
-		}).observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ['class'],
+			draw(reducedMotion ? 0 : lastDraw)
 		})
 	}
 
