@@ -36,14 +36,14 @@
 	--sidebar-accent-foreground: oklch(0.205 0 0);
 	--sidebar-border: oklch(0.922 0 0);
 	--sidebar-ring: oklch(0.708 0 0);
-	/* Pixel hero inks, faintest to strongest, from the palette above. */
-	--hero-bg: var(--background);
-	--hero-dim: var(--border);
-	--hero-mid: var(--chart-1);
-	--hero-lit: var(--muted-foreground);
-	--hero-pale: var(--chart-4);
-	--hero-crest: var(--primary);
-	--hero-flash: var(--foreground);
+	/* Pixel hero inks, faintest to strongest, from Tailwind's neutral palette. */
+	--hero-bg: var(--color-white);
+	--hero-dim: var(--color-neutral-200);
+	--hero-mid: var(--color-neutral-300);
+	--hero-lit: var(--color-neutral-500);
+	--hero-pale: var(--color-neutral-700);
+	--hero-crest: var(--color-neutral-900);
+	--hero-flash: var(--color-neutral-950);
 }
 
 .dark {
@@ -78,14 +78,14 @@
 	--sidebar-accent-foreground: oklch(0.985 0 0);
 	--sidebar-border: oklch(1 0 0 / 10%);
 	--sidebar-ring: oklch(0.556 0 0);
-	/* Pixel hero inks, faintest to strongest, from the palette above. */
-	--hero-bg: var(--background);
-	--hero-dim: var(--muted);
-	--hero-mid: var(--chart-4);
-	--hero-lit: var(--ring);
-	--hero-pale: var(--muted-foreground);
-	--hero-crest: var(--chart-1);
-	--hero-flash: var(--foreground);
+	/* Pixel hero inks, faintest to strongest, from Tailwind's neutral palette. */
+	--hero-bg: var(--color-neutral-950);
+	--hero-dim: var(--color-neutral-800);
+	--hero-mid: var(--color-neutral-700);
+	--hero-lit: var(--color-neutral-500);
+	--hero-pale: var(--color-neutral-400);
+	--hero-crest: var(--color-neutral-300);
+	--hero-flash: var(--color-neutral-50);
 }
 
 @theme inline {
