@@ -2,12 +2,13 @@
 // A hero band: a drifting, dithered pixel field with the site title drawn on
 // the same grid. The title comes in like a badly tracked VHS tape - torn
 // scanlines, then a stabilising sweep.
-// Loosely after omarchy-site's HeroPixelField, using its Solitude palette.
+// Loosely after omarchy-site's HeroPixelField. Colours are the --hero-*
+// tokens in global.css, drawn from the site's own light and dark palettes.
 ---
 
 <section
 	data-pixel-hero
-	class="relative h-[min(30vh,260px)] min-h-40 overflow-hidden bg-[#080a0b]"
+	class="relative h-[min(30vh,260px)] min-h-40 overflow-hidden bg-(--hero-bg)"
 >
 	<h1 class="sr-only">Analog Freak</h1>
 	<canvas
@@ -22,15 +23,21 @@
 </section>
 
 <script>
-	/** omarchy's Solitude inks, dimmest to brightest. */
-	const DIM = '#2a2e30'
-	const MID = '#4e5457'
-	const LIT = '#798186'
-	const PALE = '#a1a7aa'
-	const CREST = '#cccfd1'
-	const WHITE = '#eceeef'
-	/** The title's inks: its three resting bands, then a glitch flash. */
-	const TITLE_INKS = [LIT, PALE, CREST, WHITE]
+	/** The theme's inks, from the --hero-* tokens, faintest to strongest. */
+	function readInks() {
+		const style = getComputedStyle(document.documentElement)
+		const token = (name: string) => style.getPropertyValue(`--hero-${name}`).trim()
+		const [dim, mid, lit, pale, crest, flash] = [
+			'dim',
+			'mid',
+			'lit',
+			'pale',
+			'crest',
+			'flash',
+		].map(token)
+		// The title's three resting bands, then a glitch flash.
+		return { dim, mid, flash, title: [lit, pale, crest, flash] }
+	}
 
 	/** 5x7 pixel font, just the letters the title needs. */
 	const FONT: Record<string, string[]> = {
@@ -182,6 +189,7 @@
 		const ctx = canvas.getContext('2d')
 		if (!ctx) return
 
+		let ink = readInks()
 		const reducedMotion = window.matchMedia(
 			'(prefers-reduced-motion: reduce)'
 		).matches
@@ -291,7 +299,7 @@
 						0.78 * ((BAYER[(row & 7) * 8 + (col & 7)] + 0.5) / 64) +
 						0.22 * jitter[(row & 63) * 64 + (col & 63)]
 					if (lum <= threshold) continue
-					fillCell(col, row, DIM)
+					fillCell(col, row, ink.dim)
 				}
 			}
 		}
@@ -303,8 +311,8 @@
 		}
 		const drawTitle = () => {
 			for (let r = 0; r < titleRows; r++) {
-				const ink = TITLE_INKS[restLevel(r)]
-				for (let c = 0; c < titleCols; c++) if (title[r][c]) fillCell(c, r, ink)
+				const band = ink.title[restLevel(r)]
+				for (let c = 0; c < titleCols; c++) if (title[r][c]) fillCell(c, r, band)
 			}
 		}
 
@@ -330,7 +338,7 @@
 				for (let r = -pad; r < titleRows + pad; r++) {
 					for (let c = -pad; c < titleCols + pad; c++) {
 						const n = hash(c, r, tick)
-						if (n < snow) fillCell(c, r, n < snow * 0.3 ? MID : DIM)
+						if (n < snow) fillCell(c, r, n < snow * 0.3 ? ink.mid : ink.dim)
 					}
 				}
 			}
@@ -348,7 +356,7 @@
 					if (r === scanRow) {
 						// The beam: a bright line across the whole title.
 						for (let c = -3; c < titleCols + 3; c++)
-							fillCell(c, r, title[r][c] ? WHITE : MID)
+							fillCell(c, r, title[r][c] ? ink.flash : ink.mid)
 						continue
 					}
 					if (r > scanRow) {
@@ -383,11 +391,11 @@
 					const ghostShift = shift + (hash(r, tick, 6) < 0.5 ? -2 : 2)
 					for (let c = 0; c < titleCols; c++)
 						if (title[r][c] && hash(c, r, tick + 9999) < 0.5)
-							fillCell(c + ghostShift, r, DIM)
+							fillCell(c + ghostShift, r, ink.dim)
 				}
 				for (let c = 0; c < titleCols; c++)
 					if (title[r][c] && (keep >= 1 || hash(c, r, tick) < keep))
-						fillCell(c + shift, r, TITLE_INKS[level])
+						fillCell(c + shift, r, ink.title[level])
 			}
 		}
 
@@ -437,6 +445,15 @@
 		document.addEventListener('visibilitychange', () => {
 			tabVisible = !document.hidden
 			sync()
+		})
+
+		// Follow the theme toggle, which flips the .dark class on <html>.
+		new MutationObserver(() => {
+			ink = readInks()
+			draw(reducedMotion ? 0 : lastDraw)
+		}).observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class'],
 		})
 
 		new ResizeObserver(() => {
